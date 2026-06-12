@@ -1,13 +1,25 @@
 /**
  * Algoritmo de pontuação do bolão
  * @see bolão dos amigos 2026.md
+ *
+ * Regras (em ordem de prioridade):
+ * - Placar exato dos dois times (vitória A, vitória B ou empate): 12 pts
+ * - Vencedor correto + gols corretos do time vencedor: 9 pts
+ * - Empate correto, mas com quantidade de gols diferente: 7 pts
+ * - Apenas o vencedor correto, com gols diferentes: 5 pts
+ * - Demais casos: 0 pts
  */
-
 
 function asGols(valor) {
   if (valor === null || valor === undefined || valor === '') return null;
   const n = parseInt(valor, 10);
   return Number.isNaN(n) ? null : n;
+}
+
+function vencedor(golsA, golsB) {
+  if (golsA > golsB) return 'A';
+  if (golsB > golsA) return 'B';
+  return 'E';
 }
 
 export function calcularPontos(palpiteA, palpiteB, resultadoA, resultadoB) {
@@ -21,17 +33,17 @@ export function calcularPontos(palpiteA, palpiteB, resultadoA, resultadoB) {
 
   if (pa === ra && pb === rb) return 12;
 
-  const vencedorReal = ra > rb ? 'A' : rb > ra ? 'B' : 'E';
-  const vencedorPalpite = pa > pb ? 'A' : pb > pa ? 'B' : 'E';
+  const vencedorReal = vencedor(ra, rb);
+  const vencedorPalpite = vencedor(pa, pb);
 
-  if (vencedorReal === vencedorPalpite) {
-    if (vencedorReal === 'A' && pa === ra) return 9;
-    if (vencedorReal === 'B' && pb === rb) return 9;
-    if (vencedorReal === 'E') return 7;
-    return 5;
-  }
+  if (vencedorReal !== vencedorPalpite) return 0;
 
-  return 0;
+  if (vencedorReal === 'E') return 7;
+
+  if (vencedorReal === 'A' && pa === ra) return 9;
+  if (vencedorReal === 'B' && pb === rb) return 9;
+
+  return 5;
 }
 
 export function formatarPlacar(golsA, golsB) {

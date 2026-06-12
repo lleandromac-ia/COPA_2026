@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { carregarTabelaPaginada } from './lib/fetch-all.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -122,10 +123,20 @@ let jogos = [];
   }
 }
 
-// Teste 7: ranking sample
+// Teste 7: leitura paginada de palpites
 if (participantes.length && jogos.length) {
-  const { data: palpites } = await supabase.from('palpites').select('*').limit(5);
-  if (palpites?.length) ok('Leitura palpites', `amostra ${palpites.length} registros`);
+  const { count: totalPalpites } = await supabase
+    .from('palpites')
+    .select('*', { count: 'exact', head: true });
+  const palpites = await carregarTabelaPaginada(supabase, 'palpites', { order: 'id' });
+  if (palpites.length === totalPalpites) {
+    ok('Leitura paginada palpites', `${palpites.length} registros (completo)`);
+  } else {
+    fail(
+      'Leitura paginada palpites',
+      `carregados ${palpites.length}, esperado ${totalPalpites}`
+    );
+  }
 }
 
 // Teste 8: CDN supabase-js (simula browser)
