@@ -26,7 +26,11 @@ import {
   exportTableToCSV,
   GRUPOS,
   getNomeParticipante,
+  formatarDataJogo,
+  formatarHoraJogo,
+  numeroJogo,
 } from './utils.js';
+import { renderBandeira } from './flags.js';
 import { setupImportacao } from './import-ui.js';
 
 let state = {
@@ -233,13 +237,32 @@ function renderParticipantes() {
   });
 }
 
+function palpitesSomenteConsulta() {
+  return state.config.cadastro_bloqueado;
+}
+
 function renderPalpites() {
   const participanteId = $('#palpite-participante').value;
   const grupoFiltro = $('#filtro-grupo-palpites').value;
   const container = $('#palpites-container');
+  const somenteConsulta = palpitesSomenteConsulta();
+
+  $('#btn-salvar-palpites').style.display = somenteConsulta ? 'none' : '';
+  $('#palpites-page-desc').textContent = somenteConsulta
+    ? 'Consulta dos palpites registrados. O cadastro está bloqueado pelo administrador.'
+    : 'Registre os palpites para os 72 jogos da fase de grupos.';
+
+  const avisoConsulta = $('#aviso-palpites-consulta');
+  if (somenteConsulta) {
+    avisoConsulta.style.display = 'block';
+    avisoConsulta.textContent =
+      'ℹ️ Modo consulta: os palpites não podem ser alterados enquanto novos cadastros estiverem bloqueados.';
+  } else {
+    avisoConsulta.style.display = 'none';
+  }
 
   if (!participanteId) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🎯</div><p>Selecione um participante para registrar palpites.</p></div>';
+    container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">🎯</div><p>Selecione um participante para ${somenteConsulta ? 'consultar os' : 'registrar'} palpites.</p></div>`;
     return;
   }
 
@@ -256,34 +279,86 @@ function renderPalpites() {
   const gruposPresentes = [...new Set(jogosFiltrados.map((j) => j.grupo))].sort();
 
   container.innerHTML = gruposPresentes
-    .map((grupo) => {
-      const jogosGrupo = jogosFiltrados.filter((j) => j.grupo === grupo);
-      return `
-        <div class="panel grupo-section">
-          <h3 class="grupo-title">Grupo ${grupo}</h3>
-          ${jogosGrupo.map((jogo) => renderJogoPalpiteRow(jogo, palpitesMap.get(jogo.id))).join('')}
-        </div>`;
-    })
+    .map((grupo) => renderGrupoPalpitesTable(grupo, jogosFiltrados, palpitesMap, somenteConsulta))
     .join('');
 }
 
-function renderJogoPalpiteRow(jogo, palpite) {
+function renderGrupoPalpitesTable(grupo, jogosFiltrados, palpitesMap, somenteConsulta) {
+  const jogosGrupo = jogosFiltrados
+    .filter((j) => j.grupo === grupo)
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || a.codigo.localeCompare(b.codigo));
+
+  const linhas = jogosGrupo
+    .map((jogo, idx) =>
+      renderJogoPalpiteRow(jogo, palpitesMap.get(jogo.id), somenteConsulta, idx === 0, jogosGrupo.length)
+    )
+    .join('');
+
+  return `
+    <div class="panel palpites-grupo">
+      <div class="table-wrap">
+        <table class="palpites-table">
+          <thead>
+            <tr>
+              <th class="palpites-th-grupo">Grupo</th>
+              <th class="palpites-th-num">Nº</th>
+              <th class="palpites-th-data">Data</th>
+              <th class="palpites-th-hora">Hora</th>
+              <th class="palpites-th-jogo">Jogo</th>
+            </tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderJogoPalpiteRow(jogo, palpite, somenteConsulta = false, primeiraLinha = false, totalLinhas = 1) {
   const golsA = palpite?.gols_a ?? '';
   const golsB = palpite?.gols_b ?? '';
   const finalizado = jogoFinalizado(jogo);
+  const somenteLeitura = somenteConsulta || finalizado;
+  const pontos =
+    finalizado && palpite
+      ? calcularPontos(golsA, golsB, jogo.gols_a, jogo.gols_b)
+      : null;
+
+  const grupoCell = primeiraLinha
+    ? `<td class="palpites-grupo-cell" rowspan="${totalLinhas}">${jogo.grupo}</td>`
+    : '';
+
+  const metaResultado = finalizado
+    ? `<div class="palpites-meta">
+        <span class="resultado-badge resultado-badge--ok">Oficial: ${formatarPlacar(jogo.gols_a, jogo.gols_b)}</span>
+        ${pontos !== null ? `<span class="pontos-badge ${pontosBadgeClass(pontos)}">${pontos} pts</span>` : ''}
+      </div>`
+    : '';
 
   return `
-    <div class="jogo-row" data-jogo-id="${jogo.id}">
-      <span class="jogo-row__codigo">${jogo.codigo}</span>
-      <span class="jogo-row__time">${escapeHtml(jogo.time_a)}</span>
-      <div class="placar-inputs">
-        <input type="number" min="0" max="20" value="${golsA}" data-gols="a" ${finalizado ? 'disabled' : ''}>
-        <span>x</span>
-        <input type="number" min="0" max="20" value="${golsB}" data-gols="b" ${finalizado ? 'disabled' : ''}>
-      </div>
-      <span class="jogo-row__time jogo-row__time--b">${escapeHtml(jogo.time_b)}</span>
-      <span>${finalizado ? `<span class="resultado-badge resultado-badge--ok">${formatarPlacar(jogo.gols_a, jogo.gols_b)}</span>` : '<span class="resultado-badge resultado-badge--pending">Pendente</span>'}</span>
-    </div>`;
+    <tr class="palpites-row" data-jogo-id="${jogo.id}">
+      ${grupoCell}
+      <td class="palpites-num">${numeroJogo(jogo.codigo)}</td>
+      <td class="palpites-data">${formatarDataJogo(jogo.data_jogo)}</td>
+      <td class="palpites-hora">${formatarHoraJogo(jogo.data_jogo)}</td>
+      <td class="palpites-jogo-cell">
+        <div class="palpites-match">
+          <div class="palpites-team palpites-team--home">
+            <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
+            ${renderBandeira(jogo.time_a)}
+          </div>
+          <div class="palpites-placar placar-inputs">
+            <input type="number" min="0" max="20" value="${golsA}" data-gols="a" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_a)}">
+            <span class="palpites-x">x</span>
+            <input type="number" min="0" max="20" value="${golsB}" data-gols="b" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_b)}">
+          </div>
+          <div class="palpites-team palpites-team--away">
+            ${renderBandeira(jogo.time_b)}
+            <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
+          </div>
+        </div>
+        ${metaResultado}
+      </td>
+    </tr>`;
 }
 
 function renderRanking() {
@@ -527,13 +602,18 @@ function setupForms() {
   $('#filtro-grupo-palpites').addEventListener('change', () => renderPalpites());
 
   $('#btn-salvar-palpites').addEventListener('click', async () => {
+    if (palpitesSomenteConsulta()) {
+      showToast('Palpites bloqueados para edição.', 'error');
+      return;
+    }
+
     const participanteId = $('#palpite-participante').value;
     if (!participanteId) {
       showToast('Selecione um participante.', 'error');
       return;
     }
 
-    const rows = $$('#palpites-container .jogo-row');
+    const rows = $$('#palpites-container .palpites-row');
     let salvos = 0;
 
     try {
@@ -602,6 +682,7 @@ function setupForms() {
         'success'
       );
       renderParticipantes();
+      renderPalpites();
     } catch (err) {
       showToast(err.message, 'error');
       e.target.checked = !e.target.checked;

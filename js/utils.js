@@ -59,3 +59,28 @@ export function getNomeParticipante(participante) {
 }
 
 export const GRUPOS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const DIAS_ABREV = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+export function formatarDataJogo(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const dia = String(d.getDate()).padStart(2, '0');
+  const mes = MESES_ABREV[d.getMonth()];
+  const sem = DIAS_ABREV[d.getDay()];
+  return `${dia}-${mes} (${sem})`;
+}
+
+export function formatarHoraJogo(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+export function numeroJogo(codigo) {
+  const match = String(codigo || '').match(/(\d{2})$/);
+  return match ? match[1] : codigo;
+}

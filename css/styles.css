@@ -367,54 +367,116 @@ input[type='number'] {
   align-items: flex-end;
 }
 
-/* Palpites grid */
-.grupo-section {
+/* Palpites — tabela por grupo */
+.palpites-grupo {
   margin-bottom: 1.5rem;
+  padding: 0;
+  overflow: hidden;
 }
 
-.grupo-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.grupo-title::before {
-  content: '';
-  width: 4px;
-  height: 18px;
-  background: var(--accent);
-  border-radius: 2px;
-}
-
-.jogo-row {
-  display: grid;
-  grid-template-columns: 60px 1fr auto 1fr auto;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--border);
+.palpites-table {
   font-size: 0.85rem;
 }
 
-.jogo-row__codigo {
+.palpites-table th {
+  white-space: nowrap;
+}
+
+.palpites-th-grupo { width: 52px; text-align: center; }
+.palpites-th-num { width: 44px; text-align: center; }
+.palpites-th-data { width: 110px; }
+.palpites-th-hora { width: 56px; text-align: center; }
+.palpites-th-jogo { min-width: 320px; }
+
+.palpites-grupo-cell {
+  text-align: center;
+  vertical-align: middle;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.palpites-num,
+.palpites-hora {
+  text-align: center;
   color: var(--text-muted);
   font-weight: 600;
-  font-size: 0.78rem;
-}
-
-.jogo-row__time {
-  text-align: right;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.jogo-row__time--b {
+.palpites-data {
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.palpites-jogo-cell {
+  padding: 0.65rem 0.85rem !important;
+}
+
+.palpites-match {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.palpites-team {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.palpites-team--home {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.palpites-team--away {
+  justify-content: flex-start;
   text-align: left;
+}
+
+.palpites-team-name {
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.team-flag {
+  flex-shrink: 0;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  object-fit: cover;
+}
+
+.palpites-placar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.palpites-placar input[type='number'] {
+  width: 44px;
+  padding: 0.4rem 0.25rem;
+}
+
+.palpites-x {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.palpites-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+  flex-wrap: wrap;
 }
 
 .placar-inputs {
@@ -679,15 +741,25 @@ input[type='number'] {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .jogo-row {
+  .palpites-match {
     grid-template-columns: 1fr;
-    gap: 0.35rem;
+    gap: 0.5rem;
     text-align: center;
   }
 
-  .jogo-row__time,
-  .jogo-row__time--b {
+  .palpites-team--home,
+  .palpites-team--away {
+    justify-content: center;
     text-align: center;
+  }
+
+  .palpites-grupo-cell {
+    font-size: 1.1rem;
+  }
+
+  .palpites-th-data,
+  .palpites-data {
+    font-size: 0.75rem;
   }
 
   .header__inner {

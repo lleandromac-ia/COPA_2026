@@ -4,22 +4,29 @@
  */
 
 
+function asGols(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  const n = parseInt(valor, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
 export function calcularPontos(palpiteA, palpiteB, resultadoA, resultadoB) {
-  if (resultadoA === null || resultadoB === null) return null;
+  const pa = asGols(palpiteA);
+  const pb = asGols(palpiteB);
+  const ra = asGols(resultadoA);
+  const rb = asGols(resultadoB);
 
-  if (palpiteA === resultadoA && palpiteB === resultadoB) {
-    return 12;
-  }
+  if (ra === null || rb === null) return null;
+  if (pa === null || pb === null) return 0;
 
-  const vencedorReal =
-    resultadoA > resultadoB ? 'A' : resultadoB > resultadoA ? 'B' : 'E';
+  if (pa === ra && pb === rb) return 12;
 
-  const vencedorPalpite =
-    palpiteA > palpiteB ? 'A' : palpiteB > palpiteA ? 'B' : 'E';
+  const vencedorReal = ra > rb ? 'A' : rb > ra ? 'B' : 'E';
+  const vencedorPalpite = pa > pb ? 'A' : pb > pa ? 'B' : 'E';
 
   if (vencedorReal === vencedorPalpite) {
-    if (vencedorReal === 'A' && palpiteA === resultadoA) return 9;
-    if (vencedorReal === 'B' && palpiteB === resultadoB) return 9;
+    if (vencedorReal === 'A' && pa === ra) return 9;
+    if (vencedorReal === 'B' && pb === rb) return 9;
     if (vencedorReal === 'E') return 7;
     return 5;
   }
