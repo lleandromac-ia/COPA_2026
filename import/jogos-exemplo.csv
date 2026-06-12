@@ -1,0 +1,73 @@
+﻿codigo;grupo;rodada;time_a;time_b;gols_a;gols_b;data_jogo;ordem
+A01;A;1;México;África do Sul;2;0;2026-06-11 13:00;1
+A02;A;1;Coréia do Sul;República Tcheca;;;2026-06-11 20:00;2
+B01;B;1;Canadá;Bósnia e Herzegovina;;;2026-06-12 13:00;3
+D01;D;1;USA;Paraguai;;;2026-06-12 19:00;4
+B02;B;1;Catar;Suíça;;;2026-06-13 13:00;5
+C01;C;1;Brasil;Marrocos;;;2026-06-13 16:00;6
+C02;C;1;Haiti;Escócia;;;2026-06-13 19:00;7
+D02;D;1;Austrália;Turquia;;;2026-06-13 22:00;8
+E01;E;1;Alemanha;Curaçau;;;2026-06-14 11:00;9
+F01;F;1;Holanda;Japão;;;2026-06-14 14:00;10
+E02;E;1;Costa do Marfim;Equador;;;2026-06-14 17:00;11
+F02;F;1;Suécia;Tunísia;;;2026-06-14 20:00;12
+H01;H;1;Espanha;Cabo Verde;;;2026-06-15 10:00;13
+G01;G;1;Bélgica;Egito;;;2026-06-15 13:00;14
+H02;H;1;Arábia Saudita;Uruguai;;;2026-06-15 16:00;15
+G02;G;1;Irã;Nova Zelândia;;;2026-06-15 19:00;16
+I01;I;1;França;Senegal;;;2026-06-16 13:00;17
+I02;I;1;Iraque;Noruega;;;2026-06-16 16:00;18
+J01;J;1;Argentina;Argélia;;;2026-06-16 19:00;19
+J02;J;1;Áustria;Jordânia;;;2026-06-16 22:00;20
+K01;K;1;Portugal;Congo;;;2026-06-17 11:00;21
+L01;L;1;Inglaterra;Croácia;;;2026-06-17 14:00;22
+L02;L;1;Gana;Panamá;;;2026-06-17 17:00;23
+K02;K;1;Uzbequistão;Colômbia;;;2026-06-17 20:00;24
+A03;A;2;República Tcheca;África do Sul;;;2026-06-18 10:00;25
+B03;B;2;Suíça;Bósnia e Herzegovina;;;2026-06-18 13:00;26
+B04;B;2;Canadá;Catar;;;2026-06-18 16:00;27
+A04;A;2;México;Coréia do Sul;;;2026-06-18 19:00;28
+D03;D;2;USA;Austrália;;;2026-06-19 13:00;29
+C03;C;2;Escócia;Marrocos;;;2026-06-19 16:00;30
+C04;C;2;Brasil;Haiti;;;2026-06-19 18:30;31
+D04;D;2;Turquia;Paraguai;;;2026-06-19 21:00;32
+F03;F;2;Holanda;Suécia;;;2026-06-20 11:00;33
+E03;E;2;Alemanha;Costa do Marfim;;;2026-06-20 14:00;34
+E04;E;2;Equador;Curaçau;;;2026-06-20 18:00;35
+F04;F;2;Tunísia;Japão;;;2026-06-20 22:00;36
+H03;H;2;Espanha;Arábia Saudita;;;2026-06-21 10:00;37
+G03;G;2;Bélgica;Irã;;;2026-06-21 13:00;38
+H04;H;2;Uruguai;Cabo Verde;;;2026-06-21 16:00;39
+G04;G;2;Nova Zelândia;Egito;;;2026-06-21 19:00;40
+J03;J;2;Argentina;Áustria;;;2026-06-22 11:00;41
+I03;I;2;França;Iraque;;;2026-06-22 15:00;42
+I04;I;2;Noruega;Senegal;;;2026-06-22 18:00;43
+J04;J;2;Jordânia;Argélia;;;2026-06-22 21:00;44
+K03;K;2;Portugal;Uzbequistão;;;2026-06-23 11:00;45
+L03;L;2;Inglaterra;Gana;;;2026-06-23 14:00;46
+L04;L;2;Panamá;Croácia;;;2026-06-23 17:00;47
+K04;K;2;Colômbia;Congo;;;2026-06-23 20:00;48
+B05;B;3;Suíça;Canadá;;;2026-06-24 13:00;49
+B06;B;3;Bósnia e Herzegovina;Catar;;;2026-06-24 13:00;50
+C05;C;3;Escócia;Brasil;;;2026-06-24 16:00;51
+C06;C;3;Marrocos;Haiti;;;2026-06-24 16:00;52
+A05;A;3;República Tcheca;México;;;2026-06-24 19:00;53
+A06;A;3;África do Sul;Coréia do Sul;;;2026-06-24 19:00;54
+E05;E;3;Equador;Alemanha;;;2026-06-25 14:00;55
+E06;E;3;Curaçau;Costa do Marfim;;;2026-06-25 14:00;56
+F05;F;3;Tunísia;Holanda;;;2026-06-25 17:00;57
+F06;F;3;Japão;Suécia;;;2026-06-25 17:00;58
+D05;D;3;Turquia;USA;;;2026-06-25 20:00;59
+D06;D;3;Paraguai;Austrália;;;2026-06-25 20:00;60
+I05;I;3;Noruega;França;;;2026-06-26 13:00;61
+I06;I;3;Senegal;Iraque;;;2026-06-26 13:00;62
+H05;H;3;Uruguai;Espanha;;;2026-06-26 18:00;63
+H06;H;3;Cabo Verde;Arábia Saudita;;;2026-06-26 18:00;64
+G05;G;3;Nova Zelândia;Bélgica;;;2026-06-26 21:00;65
+G06;G;3;Egito;Irã;;;2026-06-26 21:00;66
+L05;L;3;Panamá;Inglaterra;;;2026-06-27 15:00;67
+L06;L;3;Croácia;Gana;;;2026-06-27 15:00;68
+K05;K;3;Colômbia;Portugal;;;2026-06-27 17:30;69
+K06;K;3;Congo;Uzbequistão;;;2026-06-27 17:30;70
+J05;J;3;Jordânia;Argentina;;;2026-06-27 20:00;71
+J06;J;3;Argélia;Áustria;;;2026-06-27 20:00;72

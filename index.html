@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bolão dos Amigos 2026 — Copa do Mundo</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header__inner">
+      <a href="#" class="logo" data-nav="dashboard">
+        <span class="logo__icon">⚽</span>
+        <div>
+          <div class="logo__title">Bolão dos Amigos</div>
+          <div class="logo__subtitle">Copa do Mundo 2026</div>
+        </div>
+      </a>
+      <nav class="nav" id="main-nav">
+        <button class="nav__link nav__link--active" data-nav="dashboard">Dashboard</button>
+        <button class="nav__link" data-nav="participantes">Participantes</button>
+        <button class="nav__link" data-nav="palpites">Palpites</button>
+        <button class="nav__link" data-nav="ranking">Ranking</button>
+        <button class="nav__link" data-nav="comparacao">Comparação</button>
+        <button class="nav__link" data-nav="perfil">Perfil</button>
+        <button class="nav__link" data-nav="admin" id="nav-admin">Admin</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main" id="app">
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <span>Carregando dados...</span>
+    </div>
+
+    <!-- Dashboard -->
+    <section class="view" id="view-dashboard">
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-desc">Acompanhe a evolução do bolão em tempo real.</p>
+      <div class="cards-grid" id="dashboard-cards"></div>
+      <div class="panel">
+        <h2 class="panel__title">Ranking Geral</h2>
+        <div class="table-wrap" id="dashboard-ranking"></div>
+      </div>
+    </section>
+
+    <!-- Participantes -->
+    <section class="view" id="view-participantes">
+      <h1 class="page-title">Participantes</h1>
+      <p class="page-desc">Cadastre e gerencie os participantes do bolão.</p>
+      <div class="panel" id="form-participante-panel">
+        <h2 class="panel__title">Novo Participante</h2>
+        <form id="form-participante">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="p-nome">Nome completo</label>
+              <input type="text" id="p-nome" required placeholder="João Silva">
+            </div>
+            <div class="form-group">
+              <label for="p-cidade">Cidade</label>
+              <input type="text" id="p-cidade" required placeholder="São Paulo/SP">
+            </div>
+          </div>
+          <button type="submit" class="btn btn--primary">Cadastrar</button>
+        </form>
+      </div>
+      <div class="panel">
+        <h2 class="panel__title">Lista de Participantes</h2>
+        <div class="table-wrap" id="lista-participantes"></div>
+      </div>
+    </section>
+
+    <!-- Palpites -->
+    <section class="view" id="view-palpites">
+      <h1 class="page-title">Palpites</h1>
+      <p class="page-desc">Registre os palpites para os 72 jogos da fase de grupos.</p>
+      <div class="filters">
+        <div class="form-group">
+          <label for="palpite-participante">Participante</label>
+          <select id="palpite-participante"></select>
+        </div>
+        <div class="form-group">
+          <label for="filtro-grupo-palpites">Grupo</label>
+          <select id="filtro-grupo-palpites">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <button class="btn btn--primary" id="btn-salvar-palpites">Salvar Palpites</button>
+      </div>
+      <div id="palpites-container"></div>
+    </section>
+
+    <!-- Ranking -->
+    <section class="view" id="view-ranking">
+      <h1 class="page-title">Ranking Geral</h1>
+      <p class="page-desc">Classificação com critérios de desempate completos.</p>
+      <div class="btn-group" style="margin-bottom: 1rem;">
+        <button class="btn btn--secondary" id="btn-export-ranking">Exportar CSV</button>
+        <button class="btn btn--secondary" id="btn-print-ranking">Imprimir / PDF</button>
+      </div>
+      <div class="panel" id="ranking-panel">
+        <div class="table-wrap" id="ranking-table"></div>
+      </div>
+    </section>
+
+    <!-- Comparação -->
+    <section class="view" id="view-comparacao">
+      <h1 class="page-title">Comparação</h1>
+      <p class="page-desc">Compare dois participantes jogo a jogo.</p>
+      <div class="panel">
+        <div class="filters">
+          <div class="form-group">
+            <label for="comp-p1">Participante 1</label>
+            <select id="comp-p1"></select>
+          </div>
+          <div class="form-group">
+            <label for="comp-p2">Participante 2</label>
+            <select id="comp-p2"></select>
+          </div>
+          <button class="btn btn--primary" id="btn-comparar">Comparar</button>
+        </div>
+        <div id="comparacao-resultado"></div>
+      </div>
+    </section>
+
+    <!-- Perfil -->
+    <section class="view" id="view-perfil">
+      <h1 class="page-title">Perfil do Participante</h1>
+      <p class="page-desc">Estatísticas e desempenho individual.</p>
+      <div class="filters">
+        <div class="form-group">
+          <label for="perfil-select">Participante</label>
+          <select id="perfil-select"></select>
+        </div>
+      </div>
+      <div id="perfil-conteudo"></div>
+    </section>
+
+    <!-- Admin -->
+    <section class="view" id="view-admin">
+      <h1 class="page-title">Administração</h1>
+      <p class="page-desc">Cadastro de resultados oficiais e configurações.</p>
+      <div id="admin-login-panel" class="panel">
+        <h2 class="panel__title">Acesso Administrativo</h2>
+        <form id="form-admin-login">
+          <div class="form-group" style="max-width: 280px;">
+            <label for="admin-pin">PIN de administrador</label>
+            <input type="password" id="admin-pin" placeholder="Digite o PIN">
+          </div>
+          <button type="submit" class="btn btn--primary" style="margin-top: 0.75rem;">Entrar</button>
+        </form>
+      </div>
+      <div id="admin-content" style="display: none;">
+        <div class="panel">
+          <div class="toggle-row">
+            <div>
+              <strong>Bloquear novos cadastros</strong>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">Impede que novos participantes se registrem.</p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="toggle-bloqueio">
+              <span class="toggle__slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="panel__title">Resultados Oficiais</h2>
+          <div class="filters">
+            <div class="form-group">
+              <label for="filtro-grupo-admin">Grupo</label>
+              <select id="filtro-grupo-admin">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filtro-rodada-admin">Rodada</label>
+              <select id="filtro-rodada-admin">
+                <option value="">Todas</option>
+                <option value="1">Rodada 1</option>
+                <option value="2">Rodada 2</option>
+                <option value="3">Rodada 3</option>
+              </select>
+            </div>
+          </div>
+          <div id="admin-jogos"></div>
+        </div>
+        <div class="panel" id="panel-importacao">
+          <h2 class="panel__title">Importar da Planilha</h2>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Importe participantes, jogos e palpites a partir de arquivos CSV ou Excel (.xlsx).
+            Modelos em <code>import/</code> — veja também <code>import/GUIA-IMPORTACAO.md</code>.
+          </p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="import-jogos">Jogos (CSV ou aba "jogos")</label>
+              <input type="file" id="import-jogos" accept=".csv,.xlsx,.xls">
+            </div>
+            <div class="form-group">
+              <label for="import-participantes">Participantes (CSV ou aba "participantes")</label>
+              <input type="file" id="import-participantes" accept=".csv,.xlsx,.xls">
+            </div>
+            <div class="form-group">
+              <label for="import-palpites">Palpites (CSV ou aba "palpites")</label>
+              <input type="file" id="import-palpites" accept=".csv,.xlsx,.xls">
+            </div>
+            <div class="form-group">
+              <label for="import-planilha-unica">Planilha única (.xlsx com 3 abas)</label>
+              <input type="file" id="import-planilha-unica" accept=".xlsx,.xls">
+            </div>
+          </div>
+          <div class="btn-group" style="margin:1rem 0;">
+            <button class="btn btn--primary" id="btn-preview-import">Pré-visualizar</button>
+            <button class="btn btn--secondary" id="btn-executar-import" disabled>Importar para o Supabase</button>
+          </div>
+          <div id="import-preview"></div>
+          <div id="import-log" style="margin-top:1rem;font-size:0.82rem;color:var(--text-muted);"></div>
+        </div>
+        <button class="btn btn--danger btn--sm" id="btn-admin-sair">Sair do modo admin</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast-container"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
