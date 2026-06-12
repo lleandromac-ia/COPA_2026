@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { carregarTabelaPaginada } from './lib/fetch-all.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configText = readFileSync(join(__dirname, '..', 'js', 'config.js'), 'utf8');
@@ -10,10 +11,10 @@ const key = configText.match(/SUPABASE_ANON_KEY\s*=\s*['"]([^'"]+)['"]/)[1];
 
 const supabase = createClient(url, key);
 
-const [{ data: participantes }, { data: jogos }, { data: palpites }] = await Promise.all([
+const [{ data: participantes }, { data: jogos }, palpites] = await Promise.all([
   supabase.from('participantes').select('*'),
   supabase.from('jogos').select('*'),
-  supabase.from('palpites').select('*'),
+  carregarTabelaPaginada(supabase, 'palpites', { order: 'id' }),
 ]);
 
 function calcularPontos(pa, pb, ra, rb) {
@@ -43,4 +44,5 @@ const ranking = participantes.map((p) => {
 
 console.log('=== Ranking (jogos com resultado) ===');
 ranking.slice(0, 5).forEach((r, i) => console.log(`${i + 1}. ${r.nome}: ${r.pts} pts`));
-console.log(`\nTotal participantes com palpites: ${participantes.length}`);
+console.log(`\nTotal participantes: ${participantes.length}`);
+console.log(`Total palpites carregados: ${palpites.length}`);

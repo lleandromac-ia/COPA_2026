@@ -18,14 +18,46 @@ export function getSupabase() {
   return client;
 }
 
+const PAGE_SIZE = 1000;
+
+/**
+ * Carrega todos os registros de uma tabela, paginando em lotes de 1000
+ * (limite padrão do PostgREST/Supabase por requisição).
+ */
+export async function carregarTabelaPaginada(supabase, tabela, { order } = {}) {
+  const todos = [];
+  let from = 0;
+
+  while (true) {
+    let query = supabase
+      .from(tabela)
+      .select('*')
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (order) {
+      query = query.order(order);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data?.length) break;
+
+    todos.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return todos;
+}
+
 export async function carregarDados() {
   const supabase = getSupabase();
 
-  const [configRes, participantesRes, jogosRes, palpitesRes] = await Promise.all([
+  const [configRes, participantesRes, jogosRes, palpites] = await Promise.all([
     supabase.from('configuracao').select('*').single(),
     supabase.from('participantes').select('*').order('nome'),
     supabase.from('jogos').select('*').order('ordem'),
-    supabase.from('palpites').select('*'),
+    carregarTabelaPaginada(supabase, 'palpites', { order: 'id' }),
   ]);
 
   if (configRes.error && configRes.error.code !== 'PGRST116') {
@@ -33,13 +65,12 @@ export async function carregarDados() {
   }
   if (participantesRes.error) throw participantesRes.error;
   if (jogosRes.error) throw jogosRes.error;
-  if (palpitesRes.error) throw palpitesRes.error;
 
   return {
     config: configRes.data || { cadastro_bloqueado: false },
     participantes: participantesRes.data || [],
     jogos: jogosRes.data || [],
-    palpites: palpitesRes.data || [],
+    palpites,
   };
 }
 
