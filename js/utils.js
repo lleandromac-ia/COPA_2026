@@ -61,15 +61,18 @@ export function getNomeParticipante(participante) {
 export const GRUPOS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const DIAS_ABREV = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+const FUSO_BRASIL = 'America/Sao_Paulo';
 
 export function formatarDataJogo(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  const dia = String(d.getDate()).padStart(2, '0');
-  const mes = MESES_ABREV[d.getMonth()];
-  const sem = DIAS_ABREV[d.getDay()];
+  const dia = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO_BRASIL, day: '2-digit' }).format(d);
+  const mesNum = parseInt(new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO_BRASIL, month: 'numeric' }).format(d), 10);
+  const mes = MESES_ABREV[mesNum - 1] || '???';
+  const semRaw = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO_BRASIL, weekday: 'short' }).format(d);
+  const sem = semRaw.replace('.', '').slice(0, 3).toLowerCase();
   return `${dia}-${mes} (${sem})`;
 }
 
@@ -77,7 +80,27 @@ export function formatarHoraJogo(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return d.toLocaleTimeString('pt-BR', {
+    timeZone: FUSO_BRASIL,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/** Converte data/hora da planilha (horário de Brasília) para ISO UTC. */
+export function parseDataJogoBrasilia(val) {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  const match = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})/);
+  if (match) {
+    const [, date, hh, mm] = match;
+    const d = new Date(`${date}T${hh.padStart(2, '0')}:${mm}:00-03:00`);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export function numeroJogo(codigo) {

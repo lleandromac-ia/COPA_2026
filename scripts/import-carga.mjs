@@ -16,6 +16,12 @@ function parseDataJogo(val) {
   if (!val) return null;
   const s = String(val).trim();
   if (!s) return null;
+  const match = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})/);
+  if (match) {
+    const [, date, hh, mm] = match;
+    const d = new Date(`${date}T${hh.padStart(2, '0')}:${mm}:00-03:00`);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
   const normalized = s.replace(' ', 'T');
   const d = new Date(normalized.includes('T') ? normalized + ':00' : normalized);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
