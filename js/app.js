@@ -93,6 +93,12 @@ function navigateTo(view) {
     view = 'dashboard';
   }
 
+  const activeView = $('.view--active');
+  const viewAnterior = activeView?.id?.replace('view-', '');
+  if (viewAnterior === 'admin' && view !== 'admin' && isAdmin()) {
+    encerrarModoAdmin(false);
+  }
+
   $$('.view').forEach((v) => v.classList.remove('view--active'));
   $$('.nav__link').forEach((l) => l.classList.remove('nav__link--active'));
 
@@ -835,6 +841,19 @@ function updateAdminUI() {
   }
 }
 
+function encerrarModoAdmin(mostrarAviso = true) {
+  setAdmin(false);
+  const pinInput = $('#admin-pin');
+  if (pinInput) pinInput.value = '';
+  updateAdminUI();
+  if ($('#view-admin')?.classList.contains('view--active')) {
+    renderAdmin();
+  }
+  if (mostrarAviso) {
+    showToast('Modo admin encerrado.', 'info');
+  }
+}
+
 function setupForms() {
   $('#form-participante').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -924,6 +943,7 @@ function setupForms() {
     const pin = $('#admin-pin').value;
     if (pin === ADMIN_PIN) {
       setAdmin(true);
+      $('#admin-pin').value = '';
       showToast('Modo administrador ativado.', 'success');
       updateAdminUI();
       renderAdmin();
@@ -950,10 +970,7 @@ function setupForms() {
   });
 
   $('#btn-admin-sair').addEventListener('click', () => {
-    setAdmin(false);
-    updateAdminUI();
-    renderAdmin();
-    showToast('Modo admin encerrado.', 'info');
+    encerrarModoAdmin(true);
   });
 
   $('#filtro-grupo-admin').addEventListener('change', () => renderAdminJogos());
