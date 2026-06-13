@@ -545,10 +545,36 @@ input[type='number'] {
 .heatmap-table th,
 .heatmap-table td {
   min-width: 36px;
-  height: 32px;
+  height: 36px;
   text-align: center;
-  padding: 0.25rem;
+  vertical-align: middle;
+  padding: 0.35rem 0.25rem;
   border: 1px solid var(--border);
+}
+
+.heatmap-axis-team {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.heatmap-axis-team--side {
+  flex-direction: column;
+  padding: 0.5rem 0.25rem;
+}
+
+.heatmap-axis-name {
+  font-weight: 600;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.team-flag--heatmap {
+  width: 24px;
+  height: 18px;
 }
 
 .heatmap-corner {
@@ -560,18 +586,15 @@ input[type='number'] {
   font-weight: 600;
   font-size: 0.78rem;
   color: var(--text-muted);
+  text-align: center;
+  vertical-align: middle;
 }
 
 .heatmap-axis-side {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
   background: var(--bg-hover);
-  font-weight: 600;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  padding: 0.35rem 0.25rem;
   vertical-align: middle;
+  text-align: center;
+  min-width: 72px;
 }
 
 .heatmap-col-head,
@@ -580,6 +603,13 @@ input[type='number'] {
   color: var(--text-muted);
   font-weight: 600;
   font-size: 0.78rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.heatmap-cell {
+  text-align: center;
+  vertical-align: middle;
 }
 
 .heatmap-cell--empty {
@@ -592,6 +622,91 @@ input[type='number'] {
   box-shadow: var(--shadow);
   position: relative;
   z-index: 1;
+}
+
+/* Admin — resultados responsivos */
+.admin-jogos-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-jogo-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.admin-jogo-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.admin-jogo-card__header strong {
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+
+.admin-jogo-card__fields {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.admin-jogo-card__placar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.admin-jogo-card__placar input[type='number'] {
+  width: 56px;
+  text-align: center;
+}
+
+.admin-jogo-card__x {
+  color: var(--text-muted);
+  font-weight: 700;
+  padding-bottom: 0.55rem;
+}
+
+.admin-jogo-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  padding-top: 0.25rem;
+}
+
+.admin-jogo-card__actions .btn {
+  flex: 1;
+  min-width: 120px;
+}
+
+@media (max-width: 768px) {
+  .admin-jogo-card__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-jogo-card__placar {
+    justify-content: stretch;
+  }
+
+  .admin-jogo-card__placar .form-group {
+    flex: 1;
+  }
 }
 
 .placar-inputs {

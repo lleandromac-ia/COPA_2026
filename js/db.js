@@ -123,6 +123,18 @@ export async function salvarResultadoJogo(jogoId, gols_a, gols_b) {
   return data;
 }
 
+export async function excluirResultadoJogo(jogoId) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('jogos')
+    .update({ gols_a: null, gols_b: null })
+    .eq('id', jogoId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function atualizarConfiguracao(cadastro_bloqueado) {
   const supabase = getSupabase();
   const { data, error } = await supabase

@@ -5,6 +5,7 @@ import {
   excluirParticipante,
   salvarPalpite,
   salvarResultadoJogo,
+  excluirResultadoJogo,
   atualizarConfiguracao,
 } from './db.js';
 import {
@@ -495,21 +496,26 @@ function renderAnalise() {
 }
 
 function renderHeatmap(jogo, analise) {
-  const { matriz, maxGols, maxContagem } = analise;
+  const { matriz, maxGolsA, maxGolsB, maxContagem } = analise;
 
   let colHeads = '';
-  for (let b = 0; b <= maxGols; b++) {
+  for (let b = 0; b <= maxGolsB; b++) {
     colHeads += `<th class="heatmap-col-head">${b}</th>`;
   }
 
   let bodyRows = '';
-  for (let a = 0; a <= maxGols; a++) {
+  for (let a = 0; a <= maxGolsA; a++) {
     const sideLabel =
       a === 0
-        ? `<th class="heatmap-axis-side" rowspan="${maxGols + 1}">${escapeHtml(jogo.time_a)}</th>`
+        ? `<th class="heatmap-axis-side" rowspan="${maxGolsA + 1}">
+            <div class="heatmap-axis-team heatmap-axis-team--side">
+              ${renderBandeira(jogo.time_a, 'team-flag team-flag--heatmap')}
+              <span class="heatmap-axis-name">${escapeHtml(jogo.time_a)}</span>
+            </div>
+          </th>`
         : '';
     let cells = sideLabel + `<th class="heatmap-row-head">${a}</th>`;
-    for (let b = 0; b <= maxGols; b++) {
+    for (let b = 0; b <= maxGolsB; b++) {
       cells += heatmapCell(matriz, a, b, maxContagem);
     }
     bodyRows += `<tr>${cells}</tr>`;
@@ -521,7 +527,12 @@ function renderHeatmap(jogo, analise) {
         <thead>
           <tr>
             <th class="heatmap-corner" colspan="2"></th>
-            <th class="heatmap-axis-label" colspan="${maxGols + 1}">${escapeHtml(jogo.time_b)}</th>
+            <th class="heatmap-axis-label" colspan="${maxGolsB + 1}">
+              <div class="heatmap-axis-team">
+                ${renderBandeira(jogo.time_b, 'team-flag team-flag--heatmap')}
+                <span class="heatmap-axis-name">${escapeHtml(jogo.time_b)}</span>
+              </div>
+            </th>
           </tr>
           <tr>
             <th class="heatmap-corner" colspan="2"></th>
@@ -739,32 +750,51 @@ function renderAdminJogos() {
   });
 
   $('#admin-jogos').innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Jogo</th><th>Grupo</th><th>Rodada</th><th>Time A</th><th>Gols A</th><th>Gols B</th><th>Time B</th><th></th></tr>
-        </thead>
-        <tbody>${jogosFiltrados.map((jogo) => `
-          <tr data-admin-jogo="${jogo.id}">
-            <td>${jogo.codigo}</td>
-            <td>${jogo.grupo}</td>
-            <td>${jogo.rodada}</td>
-            <td><input type="text" value="${escapeHtml(jogo.time_a)}" data-field="time_a" style="width:120px"></td>
-            <td><input type="number" min="0" max="20" value="${jogo.gols_a ?? ''}" data-field="gols_a"></td>
-            <td><input type="number" min="0" max="20" value="${jogo.gols_b ?? ''}" data-field="gols_b"></td>
-            <td><input type="text" value="${escapeHtml(jogo.time_b)}" data-field="time_b" style="width:120px"></td>
-            <td><button class="btn btn--primary btn--sm" data-save-jogo="${jogo.id}">Salvar</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
+    <div class="admin-jogos-list">
+      ${jogosFiltrados.map((jogo) => {
+        const temResultado = jogo.gols_a !== null && jogo.gols_b !== null;
+        return `
+        <article class="admin-jogo-card" data-admin-jogo="${jogo.id}">
+          <div class="admin-jogo-card__header">
+            <strong>${jogo.codigo}</strong>
+            <span>Grupo ${jogo.grupo} · Rodada ${jogo.rodada}</span>
+            ${temResultado ? '<span class="resultado-badge resultado-badge--ok">Com resultado</span>' : '<span class="resultado-badge resultado-badge--pending">Sem resultado</span>'}
+          </div>
+          <div class="admin-jogo-card__fields">
+            <div class="form-group">
+              <label>Time A</label>
+              <input type="text" value="${escapeHtml(jogo.time_a)}" data-field="time_a">
+            </div>
+            <div class="admin-jogo-card__placar">
+              <div class="form-group">
+                <label>Gols A</label>
+                <input type="number" min="0" max="20" value="${jogo.gols_a ?? ''}" data-field="gols_a" placeholder="—">
+              </div>
+              <span class="admin-jogo-card__x">x</span>
+              <div class="form-group">
+                <label>Gols B</label>
+                <input type="number" min="0" max="20" value="${jogo.gols_b ?? ''}" data-field="gols_b" placeholder="—">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Time B</label>
+              <input type="text" value="${escapeHtml(jogo.time_b)}" data-field="time_b">
+            </div>
+          </div>
+          <div class="admin-jogo-card__actions">
+            <button type="button" class="btn btn--primary btn--sm" data-save-jogo="${jogo.id}">Salvar</button>
+            <button type="button" class="btn btn--danger btn--sm" data-clear-jogo="${jogo.id}" ${temResultado ? '' : 'disabled'}>Excluir placar</button>
+          </div>
+        </article>`;
+      }).join('')}
     </div>`;
 
   $$('[data-save-jogo]').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const row = btn.closest('tr');
+      const card = btn.closest('.admin-jogo-card');
       const jogoId = btn.dataset.saveJogo;
-      const golsA = row.querySelector('[data-field="gols_a"]').value;
-      const golsB = row.querySelector('[data-field="gols_b"]').value;
+      const golsA = card.querySelector('[data-field="gols_a"]').value;
+      const golsB = card.querySelector('[data-field="gols_b"]').value;
 
       if (golsA === '' || golsB === '') {
         showToast('Informe os gols de ambos os times.', 'error');
@@ -774,6 +804,21 @@ function renderAdminJogos() {
       try {
         await salvarResultadoJogo(jogoId, parseInt(golsA, 10), parseInt(golsB, 10));
         showToast('Resultado salvo! Ranking atualizado.', 'success');
+        await refreshData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+
+  $$('[data-clear-jogo]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      if (!confirm('Excluir o placar oficial deste jogo? Os gols serão removidos.')) return;
+
+      try {
+        await excluirResultadoJogo(btn.dataset.clearJogo);
+        showToast('Placar excluído.', 'success');
         await refreshData();
       } catch (err) {
         showToast(err.message, 'error');

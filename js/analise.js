@@ -40,22 +40,31 @@ export function analisarPalpitesJogo(jogo, palpites, ranking) {
   let empate = 0;
   let vitB = 0;
 
-  const maxGols = 7;
+  let maxGolsA = 0;
+  let maxGolsB = 0;
   const matriz = {};
-  for (let a = 0; a <= maxGols; a++) {
-    for (let b = 0; b <= maxGols; b++) matriz[`${a}-${b}`] = 0;
-  }
 
   for (const p of palpitesJogo) {
     const ga = parseInt(p.gols_a, 10);
     const gb = parseInt(p.gols_b, 10);
     if (Number.isNaN(ga) || Number.isNaN(gb)) continue;
 
+    if (ga > maxGolsA) maxGolsA = ga;
+    if (gb > maxGolsB) maxGolsB = gb;
+
     if (ga > gb) vitA++;
     else if (ga === gb) empate++;
     else vitB++;
 
-    if (ga <= maxGols && gb <= maxGols) matriz[`${ga}-${gb}`]++;
+    const key = `${ga}-${gb}`;
+    matriz[key] = (matriz[key] || 0) + 1;
+  }
+
+  for (let a = 0; a <= maxGolsA; a++) {
+    for (let b = 0; b <= maxGolsB; b++) {
+      const key = `${a}-${b}`;
+      if (matriz[key] === undefined) matriz[key] = 0;
+    }
   }
 
   let maxContagem = 0;
@@ -87,7 +96,8 @@ export function analisarPalpitesJogo(jogo, palpites, ranking) {
     pctEmpate: pct(empate),
     pctB: pct(vitB),
     matriz,
-    maxGols,
+    maxGolsA,
+    maxGolsB,
     maxContagem,
     listaRanking,
   };
