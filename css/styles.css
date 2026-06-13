@@ -479,6 +479,121 @@ input[type='number'] {
   flex-wrap: wrap;
 }
 
+/* Análise de palpites */
+.analise-header-panel {
+  text-align: center;
+}
+
+.analise-match-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.analise-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.analise-vs {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.analise-meta {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.analise-outcome-table {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.analise-outcome-table th,
+.analise-outcome-table td {
+  text-align: center;
+}
+
+.analise-outcome-corner {
+  text-align: left !important;
+  font-size: 0.82rem;
+}
+
+.analise-outcome-label {
+  text-align: left !important;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.heatmap-wrap {
+  overflow-x: auto;
+}
+
+.heatmap-table {
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.heatmap-table th,
+.heatmap-table td {
+  min-width: 36px;
+  height: 32px;
+  text-align: center;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+}
+
+.heatmap-corner {
+  background: var(--bg);
+}
+
+.heatmap-axis-label {
+  background: var(--bg-hover);
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.heatmap-axis-side {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  background: var(--bg-hover);
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding: 0.35rem 0.25rem;
+  vertical-align: middle;
+}
+
+.heatmap-col-head,
+.heatmap-row-head {
+  background: var(--bg);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.heatmap-cell--empty {
+  background: rgba(0, 200, 83, 0.12);
+  color: var(--text-muted);
+}
+
+.heatmap-cell--filled:hover {
+  transform: scale(1.06);
+  box-shadow: var(--shadow);
+  position: relative;
+  z-index: 1;
+}
+
 .placar-inputs {
   display: flex;
   align-items: center;

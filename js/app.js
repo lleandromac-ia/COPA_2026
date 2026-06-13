@@ -32,6 +32,12 @@ import {
 } from './utils.js';
 import { renderBandeira } from './flags.js';
 import { setupImportacao } from './import-ui.js';
+import {
+  getJogosPendentes,
+  getJogoPadraoAnalise,
+  analisarPalpitesJogo,
+  corHeatmap,
+} from './analise.js';
 
 let state = {
   config: { cadastro_bloqueado: false },
@@ -67,6 +73,7 @@ async function refreshData() {
   const dados = await carregarDados();
   state = dados;
   populateSelects();
+  updateNavVisibility();
   updateAdminUI();
   renderCurrentView();
 }
@@ -81,6 +88,10 @@ function setupNavigation() {
 }
 
 function navigateTo(view) {
+  if (view === 'participantes' && state.config.cadastro_bloqueado) {
+    view = 'dashboard';
+  }
+
   $$('.view').forEach((v) => v.classList.remove('view--active'));
   $$('.nav__link').forEach((l) => l.classList.remove('nav__link--active'));
 
@@ -102,6 +113,7 @@ function renderView(view) {
     case 'dashboard': renderDashboard(); break;
     case 'participantes': renderParticipantes(); break;
     case 'palpites': renderPalpites(); break;
+    case 'analise': renderAnalise(); break;
     case 'ranking': renderRanking(); break;
     case 'comparacao': renderComparacao(); break;
     case 'perfil': renderPerfil(); break;
@@ -133,6 +145,47 @@ function populateSelects() {
       GRUPOS.map((g) => `<option value="${g}">Grupo ${g}</option>`).join('');
     sel.value = current;
   });
+
+  populateAnaliseSelect();
+}
+
+function populateAnaliseSelect() {
+  const sel = $('#analise-jogo');
+  if (!sel) return;
+
+  const current = sel.value;
+  const pendentes = getJogosPendentes(state.jogos);
+  const padrao = getJogoPadraoAnalise(state.jogos);
+
+  if (!pendentes.length) {
+    sel.innerHTML = '<option value="">Nenhuma partida pendente</option>';
+    return;
+  }
+
+  sel.innerHTML = pendentes
+    .map((j) => {
+      const label = `${j.codigo} — ${j.time_a} x ${j.time_b} (${formatarDataJogo(j.data_jogo)} ${formatarHoraJogo(j.data_jogo)})`;
+      return `<option value="${j.id}">${escapeHtml(label)}</option>`;
+    })
+    .join('');
+
+  if (current && pendentes.some((j) => j.id === current)) {
+    sel.value = current;
+  } else if (padrao) {
+    sel.value = padrao.id;
+  }
+}
+
+function updateNavVisibility() {
+  const navParticipantes = $('#nav-participantes');
+  if (!navParticipantes) return;
+
+  const ocultar = state.config.cadastro_bloqueado;
+  navParticipantes.style.display = ocultar ? 'none' : '';
+
+  if (ocultar && $('#view-participantes')?.classList.contains('view--active')) {
+    navigateTo('dashboard');
+  }
 }
 
 function getRanking() {
@@ -359,6 +412,166 @@ function renderJogoPalpiteRow(jogo, palpite, somenteConsulta = false, primeiraLi
         ${metaResultado}
       </td>
     </tr>`;
+}
+
+function renderAnalise() {
+  const container = $('#analise-conteudo');
+  const jogoId = $('#analise-jogo')?.value;
+  const pendentes = getJogosPendentes(state.jogos);
+
+  if (!pendentes.length) {
+    container.innerHTML =
+      '<div class="empty-state"><div class="empty-state__icon">📊</div><p>Todos os jogos já possuem resultado oficial.</p></div>';
+    return;
+  }
+
+  if (!jogoId) {
+    container.innerHTML =
+      '<div class="empty-state"><div class="empty-state__icon">📊</div><p>Selecione uma partida.</p></div>';
+    return;
+  }
+
+  const jogo = state.jogos.find((j) => j.id === jogoId);
+  if (!jogo) return;
+
+  const ranking = getRanking();
+  const analise = analisarPalpitesJogo(jogo, state.palpites, ranking);
+
+  container.innerHTML = `
+    <div class="panel analise-header-panel">
+      <div class="analise-match-title">
+        <span class="analise-team analise-team--home">
+          <span>${escapeHtml(jogo.time_a)}</span>
+          ${renderBandeira(jogo.time_a)}
+        </span>
+        <span class="analise-vs">X</span>
+        <span class="analise-team analise-team--away">
+          ${renderBandeira(jogo.time_b)}
+          <span>${escapeHtml(jogo.time_b)}</span>
+        </span>
+      </div>
+      <p class="analise-meta">${jogo.codigo} · Grupo ${jogo.grupo} · ${formatarDataJogo(jogo.data_jogo)} · ${formatarHoraJogo(jogo.data_jogo)} · ${analise.total} palpite(s)</p>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Probabilidade dos palpites</h2>
+      <div class="table-wrap">
+        <table class="analise-outcome-table">
+          <thead>
+            <tr>
+              <th class="analise-outcome-corner">${escapeHtml(jogo.time_a)} X ${escapeHtml(jogo.time_b)}</th>
+              <th>vit. A</th>
+              <th>empate</th>
+              <th>vit. B</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="analise-outcome-label">Palpites</td>
+              <td>${analise.vitA}</td>
+              <td>${analise.empate}</td>
+              <td>${analise.vitB}</td>
+            </tr>
+            <tr>
+              <td class="analise-outcome-label">%</td>
+              <td>${analise.pctA}%</td>
+              <td>${analise.pctEmpate}%</td>
+              <td>${analise.pctB}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Mapa de calor — placares palpitados</h2>
+      ${renderHeatmap(jogo, analise)}
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Palpites por participante (ordem do ranking)</h2>
+      <div class="table-wrap">${renderListaPalpitesAnalise(analise)}</div>
+    </div>`;
+}
+
+function renderHeatmap(jogo, analise) {
+  const { matriz, maxGols, maxContagem } = analise;
+
+  let colHeads = '';
+  for (let b = 0; b <= maxGols; b++) {
+    colHeads += `<th class="heatmap-col-head">${b}</th>`;
+  }
+
+  let bodyRows = '';
+  for (let a = 0; a <= maxGols; a++) {
+    const sideLabel =
+      a === 0
+        ? `<th class="heatmap-axis-side" rowspan="${maxGols + 1}">${escapeHtml(jogo.time_a)}</th>`
+        : '';
+    let cells = sideLabel + `<th class="heatmap-row-head">${a}</th>`;
+    for (let b = 0; b <= maxGols; b++) {
+      cells += heatmapCell(matriz, a, b, maxContagem);
+    }
+    bodyRows += `<tr>${cells}</tr>`;
+  }
+
+  return `
+    <div class="heatmap-wrap">
+      <table class="heatmap-table">
+        <thead>
+          <tr>
+            <th class="heatmap-corner" colspan="2"></th>
+            <th class="heatmap-axis-label" colspan="${maxGols + 1}">${escapeHtml(jogo.time_b)}</th>
+          </tr>
+          <tr>
+            <th class="heatmap-corner" colspan="2"></th>
+            ${colHeads}
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>`;
+}
+
+function heatmapCell(matriz, a, b, maxContagem) {
+  const count = matriz[`${a}-${b}`] || 0;
+  const bg = corHeatmap(count, maxContagem);
+  const style = bg ? `background:${bg};color:#1a1a1a;font-weight:700;` : '';
+  const content = count === 0 ? '—' : count;
+  return `<td class="heatmap-cell ${count === 0 ? 'heatmap-cell--empty' : 'heatmap-cell--filled'}" style="${style}">${content}</td>`;
+}
+
+function renderListaPalpitesAnalise(analise) {
+  if (!analise.listaRanking.length) {
+    return '<p style="color:var(--text-muted);font-size:0.85rem;">Nenhum palpite registrado para esta partida.</p>';
+  }
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Pos.</th>
+          <th>Participante</th>
+          <th>Cidade</th>
+          <th>Palpite</th>
+          <th>Pontos no bolão</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${analise.listaRanking
+          .map(
+            ({ posicao, participante, palpite, pontosTotal }) => `
+          <tr>
+            <td>${posBadge(posicao)}</td>
+            <td>${escapeHtml(participante.nome)}</td>
+            <td>${escapeHtml(participante.cidade || '—')}</td>
+            <td><strong>${formatarPlacar(palpite.gols_a, palpite.gols_b)}</strong></td>
+            <td>${pontosTotal}</td>
+          </tr>`
+          )
+          .join('')}
+      </tbody>
+    </table>`;
 }
 
 function renderRanking() {
@@ -600,6 +813,7 @@ function setupForms() {
 
   $('#palpite-participante').addEventListener('change', () => renderPalpites());
   $('#filtro-grupo-palpites').addEventListener('change', () => renderPalpites());
+  $('#analise-jogo').addEventListener('change', () => renderAnalise());
 
   $('#btn-salvar-palpites').addEventListener('click', async () => {
     if (palpitesSomenteConsulta()) {
@@ -683,6 +897,7 @@ function setupForms() {
       );
       renderParticipantes();
       renderPalpites();
+      updateNavVisibility();
     } catch (err) {
       showToast(err.message, 'error');
       e.target.checked = !e.target.checked;

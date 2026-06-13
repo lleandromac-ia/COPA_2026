@@ -18,8 +18,9 @@
       </a>
       <nav class="nav" id="main-nav">
         <button class="nav__link nav__link--active" data-nav="dashboard">Dashboard</button>
-        <button class="nav__link" data-nav="participantes">Participantes</button>
+        <button class="nav__link" data-nav="participantes" id="nav-participantes">Participantes</button>
         <button class="nav__link" data-nav="palpites">Palpites</button>
+        <button class="nav__link" data-nav="analise">Análise</button>
         <button class="nav__link" data-nav="ranking">Ranking</button>
         <button class="nav__link" data-nav="comparacao">Comparação</button>
         <button class="nav__link" data-nav="perfil">Perfil</button>
@@ -90,6 +91,19 @@
         <button class="btn btn--primary" id="btn-salvar-palpites">Salvar Palpites</button>
       </div>
       <div id="palpites-container"></div>
+    </section>
+
+    <!-- Análise de palpites -->
+    <section class="view" id="view-analise">
+      <h1 class="page-title">Análise de Palpites</h1>
+      <p class="page-desc">Distribuição dos palpites para uma partida que ainda não ocorreu.</p>
+      <div class="filters">
+        <div class="form-group" style="flex:1;min-width:280px;">
+          <label for="analise-jogo">Partida</label>
+          <select id="analise-jogo"></select>
+        </div>
+      </div>
+      <div id="analise-conteudo"></div>
     </section>
 
     <!-- Ranking -->
