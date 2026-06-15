@@ -108,20 +108,78 @@ export function calcularRanking(participantes, jogos, palpites) {
     return { participante: p, ...stats };
   });
 
-  ranking.sort((a, b) => {
-    if (b.pontosTotal !== a.pontosTotal) return b.pontosTotal - a.pontosTotal;
-    if (b.placaresExatos !== a.placaresExatos)
-      return b.placaresExatos - a.placaresExatos;
-    if (b.acertosVencedor !== a.acertosVencedor)
-      return b.acertosVencedor - a.acertosVencedor;
-    if (a.erros !== b.erros) return a.erros - b.erros;
-    return String(a.participante.nome || '').localeCompare(
-      String(b.participante.nome || ''),
-      'pt-BR'
-    );
-  });
+  ranking.sort(compararRankingItens);
 
-  return ranking.map((item, index) => ({ posicao: index + 1, ...item }));
+  return atribuirPosicoesRanking(ranking);
+}
+
+/**
+ * Posições compartilhadas por pontuação (ranking competitivo).
+ * Ex.: dois com mesma pontuação em 1º → ambos 1º; o seguinte fica em 3º.
+ */
+export function atribuirPosicoesRanking(ranking) {
+  let posicao = 1;
+  return ranking.map((item, index) => {
+    if (index > 0 && item.pontosTotal !== ranking[index - 1].pontosTotal) {
+      posicao = index + 1;
+    }
+    return { posicao, ...item };
+  });
+}
+
+/** Posição que uma pontuação ocuparia em um ranking já ordenado (desc). */
+export function calcularPosicaoPorPontuacao(pontosTotal, rankingOrdenado) {
+  if (!rankingOrdenado.length) return 1;
+
+  let posicao = 1;
+  for (let i = 0; i < rankingOrdenado.length; i++) {
+    if (i > 0 && rankingOrdenado[i].pontosTotal !== rankingOrdenado[i - 1].pontosTotal) {
+      posicao = i + 1;
+    }
+    if (pontosTotal === rankingOrdenado[i].pontosTotal) return posicao;
+    if (pontosTotal > rankingOrdenado[i].pontosTotal) return posicao;
+  }
+
+  const n = rankingOrdenado.length;
+  let posUltima = 1;
+  for (let i = 0; i < n; i++) {
+    if (i > 0 && rankingOrdenado[i].pontosTotal !== rankingOrdenado[i - 1].pontosTotal) {
+      posUltima = i + 1;
+    }
+  }
+  const qtdUltimaPos = rankingOrdenado.filter(
+    (r) => r.pontosTotal === rankingOrdenado[n - 1].pontosTotal
+  ).length;
+  return posUltima + qtdUltimaPos;
+}
+
+/** Ranking com resultados simulados (override por jogo_id). */
+export function calcularRankingComOverrides(participantes, jogos, palpites, overrides = {}) {
+  const jogosEff = jogos.map((j) => {
+    const o = overrides[j.id];
+    if (!o) return j;
+    return { ...j, gols_a: o.gols_a, gols_b: o.gols_b };
+  });
+  return calcularRanking(participantes, jogosEff, palpites);
+}
+
+export function compararRankingItens(a, b) {
+  if (b.pontosTotal !== a.pontosTotal) return b.pontosTotal - a.pontosTotal;
+  if (b.placaresExatos !== a.placaresExatos)
+    return b.placaresExatos - a.placaresExatos;
+  if (b.acertosVencedor !== a.acertosVencedor)
+    return b.acertosVencedor - a.acertosVencedor;
+  if (a.erros !== b.erros) return a.erros - b.erros;
+  return String(a.participante.nome || '').localeCompare(
+    String(b.participante.nome || ''),
+    'pt-BR'
+  );
+}
+
+export function determinarVencedoresRanking(ranking) {
+  if (!ranking.length) return [];
+  const ptsLider = ranking[0].pontosTotal;
+  return ranking.filter((r) => r.pontosTotal === ptsLider);
 }
 
 export function compararParticipantes(id1, id2, jogos, palpites) {

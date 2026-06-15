@@ -34,17 +34,34 @@ import {
 import { renderBandeira } from './flags.js';
 import { setupImportacao } from './import-ui.js';
 import {
-  getJogosPendentes,
+  TIPOS_ANALISE,
+  getAnalisesHabilitadas,
+  getTodosJogosAnalise,
   getJogoPadraoAnalise,
   analisarPalpitesJogo,
+  simularRankingComPlacar,
+  calcularPossibilidadesVencer,
+  calcularAnalisePlacarFavorito,
   corHeatmap,
+  PLACAR_FAVORITO_ID,
+  PLACAR_FAVORITO_NOME,
 } from './analise.js';
 
 let state = {
-  config: { cadastro_bloqueado: false },
+  config: {
+    cadastro_bloqueado: false,
+    analise_palpites_jogo: true,
+    analise_possibilidades_vencer: false,
+    analise_placar_favorito: false,
+  },
   participantes: [],
   jogos: [],
   palpites: [],
+};
+
+const analiseState = {
+  tipo: null,
+  simulacao: null,
 };
 
 const palpitesPendentes = new Map();
@@ -93,6 +110,10 @@ function navigateTo(view) {
     view = 'dashboard';
   }
 
+  if (view === 'analise' && !getAnalisesHabilitadas(state.config).length) {
+    view = 'dashboard';
+  }
+
   const activeView = $('.view--active');
   const viewAnterior = activeView?.id?.replace('view-', '');
   if (viewAnterior === 'admin' && view !== 'admin' && isAdmin()) {
@@ -120,7 +141,11 @@ function renderView(view) {
     case 'dashboard': renderDashboard(); break;
     case 'participantes': renderParticipantes(); break;
     case 'palpites': renderPalpites(); break;
-    case 'analise': renderAnalise(); break;
+    case 'analise':
+      ensureAnaliseTipo();
+      if (analiseState.tipo === 'palpites_jogo') definirJogoPadraoAnalise();
+      renderAnalise();
+      break;
     case 'ranking': renderRanking(); break;
     case 'comparacao': renderComparacao(); break;
     case 'perfil': renderPerfil(); break;
@@ -154,6 +179,32 @@ function populateSelects() {
   });
 
   populateAnaliseSelect();
+  updateAnaliseNavVisibility();
+}
+
+function getAnalisesAtivas() {
+  return getAnalisesHabilitadas(state.config);
+}
+
+function ensureAnaliseTipo() {
+  const ativas = getAnalisesAtivas();
+  if (!ativas.length) {
+    analiseState.tipo = null;
+    return;
+  }
+  if (!ativas.some((t) => t.id === analiseState.tipo)) {
+    analiseState.tipo = ativas[0].id;
+  }
+}
+
+function updateAnaliseNavVisibility() {
+  const navAnalise = $('[data-nav="analise"]');
+  if (!navAnalise) return;
+  const ativas = getAnalisesAtivas();
+  navAnalise.style.display = ativas.length ? '' : 'none';
+  if (!ativas.length && $('#view-analise')?.classList.contains('view--active')) {
+    navigateTo('dashboard');
+  }
 }
 
 function populateAnaliseSelect() {
@@ -161,24 +212,33 @@ function populateAnaliseSelect() {
   if (!sel) return;
 
   const current = sel.value;
-  const pendentes = getJogosPendentes(state.jogos);
+  const todos = getTodosJogosAnalise(state.jogos);
   const padrao = getJogoPadraoAnalise(state.jogos);
 
-  if (!pendentes.length) {
-    sel.innerHTML = '<option value="">Nenhuma partida pendente</option>';
+  if (!todos.length) {
+    sel.innerHTML = '<option value="">Nenhuma partida cadastrada</option>';
     return;
   }
 
-  sel.innerHTML = pendentes
+  sel.innerHTML = todos
     .map((j) => {
-      const label = `${j.codigo} — ${j.time_a} x ${j.time_b} (${formatarDataJogo(j.data_jogo)} ${formatarHoraJogo(j.data_jogo)})`;
+      const status = jogoFinalizado(j) ? ' ✓' : '';
+      const label = `${j.codigo} — ${j.time_a} x ${j.time_b} (${formatarDataJogo(j.data_jogo)} ${formatarHoraJogo(j.data_jogo)})${status}`;
       return `<option value="${j.id}">${escapeHtml(label)}</option>`;
     })
     .join('');
 
-  if (current && pendentes.some((j) => j.id === current)) {
+  if (current && todos.some((j) => j.id === current)) {
     sel.value = current;
   } else if (padrao) {
+    sel.value = padrao.id;
+  }
+}
+
+function definirJogoPadraoAnalise() {
+  const padrao = getJogoPadraoAnalise(state.jogos);
+  const sel = $('#analise-jogo');
+  if (padrao && sel && sel.options.length) {
     sel.value = padrao.id;
   }
 }
@@ -189,6 +249,8 @@ function updateNavVisibility() {
 
   const ocultar = state.config.cadastro_bloqueado;
   navParticipantes.style.display = ocultar ? 'none' : '';
+
+  updateAnaliseNavVisibility();
 
   if (ocultar && $('#view-participantes')?.classList.contains('view--active')) {
     navigateTo('dashboard');
@@ -422,13 +484,73 @@ function renderJogoPalpiteRow(jogo, palpite, somenteConsulta = false, primeiraLi
 }
 
 function renderAnalise() {
+  const ativas = getAnalisesAtivas();
+  const subnav = $('#analise-subnav');
+  const filtros = $('#analise-filtros');
   const container = $('#analise-conteudo');
-  const jogoId = $('#analise-jogo')?.value;
-  const pendentes = getJogosPendentes(state.jogos);
 
-  if (!pendentes.length) {
+  if (!ativas.length) {
+    subnav.innerHTML = '';
+    filtros.innerHTML = '';
     container.innerHTML =
-      '<div class="empty-state"><div class="empty-state__icon">📊</div><p>Todos os jogos já possuem resultado oficial.</p></div>';
+      '<div class="empty-state"><div class="empty-state__icon">🔒</div><p>Nenhuma análise liberada pelo administrador.</p></div>';
+    return;
+  }
+
+  ensureAnaliseTipo();
+
+  subnav.innerHTML = ativas
+    .map(
+      (t) =>
+        `<button type="button" class="analise-subnav__btn ${analiseState.tipo === t.id ? 'analise-subnav__btn--active' : ''}" data-analise-tipo="${t.id}">${escapeHtml(t.label)}</button>`
+    )
+    .join('');
+
+  subnav.querySelectorAll('[data-analise-tipo]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      analiseState.tipo = btn.dataset.analiseTipo;
+      analiseState.simulacao = null;
+      renderAnalise();
+    });
+  });
+
+  if (analiseState.tipo === 'palpites_jogo') {
+    filtros.innerHTML = `
+      <div class="filters">
+        <div class="form-group" style="flex:1;min-width:280px;">
+          <label for="analise-jogo">Partida</label>
+          <select id="analise-jogo"></select>
+        </div>
+      </div>`;
+    populateAnaliseSelect();
+    $('#analise-jogo')?.addEventListener('change', () => {
+      analiseState.simulacao = null;
+      renderAnaliseConteudo();
+    });
+    renderAnaliseConteudo();
+    return;
+  }
+
+  filtros.innerHTML = '';
+  if (analiseState.tipo === 'possibilidades_vencer') {
+    renderAnalisePossibilidades(container);
+  } else if (analiseState.tipo === 'placar_favorito') {
+    renderAnalisePlacarFavorito(container);
+  }
+}
+
+function renderAnaliseConteudo() {
+  const container = $('#analise-conteudo');
+  if (analiseState.tipo !== 'palpites_jogo') return;
+  renderAnalisePalpitesJogo(container);
+}
+
+function renderAnalisePalpitesJogo(container) {
+  const jogoId = $('#analise-jogo')?.value;
+
+  if (!state.jogos.length) {
+    container.innerHTML =
+      '<div class="empty-state"><div class="empty-state__icon">📊</div><p>Nenhuma partida cadastrada.</p></div>';
     return;
   }
 
@@ -438,11 +560,31 @@ function renderAnalise() {
     return;
   }
 
+  if (analiseState.simulacao?.jogoId !== jogoId) {
+    analiseState.simulacao = null;
+  }
+
   const jogo = state.jogos.find((j) => j.id === jogoId);
   if (!jogo) return;
 
   const ranking = getRanking();
   const analise = analisarPalpitesJogo(jogo, state.palpites, ranking);
+  const statusJogo = jogoFinalizado(jogo)
+    ? ` · Resultado: ${formatarPlacar(jogo.gols_a, jogo.gols_b)}`
+    : '';
+
+  const sim = analiseState.simulacao;
+  const rankingSim =
+    sim && sim.jogoId === jogoId
+      ? simularRankingComPlacar(
+          state.participantes,
+          state.jogos,
+          state.palpites,
+          jogoId,
+          sim.golsA,
+          sim.golsB
+        )
+      : null;
 
   container.innerHTML = `
     <div class="panel analise-header-panel">
@@ -457,7 +599,7 @@ function renderAnalise() {
           <span>${escapeHtml(jogo.time_b)}</span>
         </span>
       </div>
-      <p class="analise-meta">${jogo.codigo} · Grupo ${jogo.grupo} · ${formatarDataJogo(jogo.data_jogo)} · ${formatarHoraJogo(jogo.data_jogo)} · ${analise.total} palpite(s)</p>
+      <p class="analise-meta">${jogo.codigo} · Grupo ${jogo.grupo} · ${formatarDataJogo(jogo.data_jogo)} · ${formatarHoraJogo(jogo.data_jogo)}${statusJogo} · ${analise.total} palpite(s)</p>
     </div>
 
     <div class="panel">
@@ -492,28 +634,242 @@ function renderAnalise() {
 
     <div class="panel">
       <h2 class="panel__title">Mapa de calor — placares palpitados</h2>
-      ${renderHeatmap(jogo, analise)}
+      <p class="heatmap-hint">Clique em um placar para simular como resultado oficial desta partida e ver o ranking atualizado.</p>
+      ${renderHeatmap(jogo, analise, sim)}
+      ${sim && sim.jogoId === jogoId ? renderSimulacaoRanking(jogo, sim, rankingSim, ranking) : ''}
     </div>
 
     <div class="panel">
       <h2 class="panel__title">Palpites por participante (ordem do ranking)</h2>
-      <div class="table-wrap">${renderListaPalpitesAnalise(analise)}</div>
+      <div class="table-wrap">${renderListaPalpitesAnalise(analise, rankingSim)}</div>
+    </div>`;
+
+  container.querySelectorAll('[data-heatmap-cell]').forEach((cell) => {
+    cell.addEventListener('click', () => {
+      const golsA = parseInt(cell.dataset.golsA, 10);
+      const golsB = parseInt(cell.dataset.golsB, 10);
+      analiseState.simulacao = { jogoId, golsA, golsB };
+      renderAnaliseConteudo();
+    });
+  });
+
+  $('#btn-limpar-simulacao')?.addEventListener('click', () => {
+    analiseState.simulacao = null;
+    renderAnaliseConteudo();
+  });
+}
+
+function renderSimulacaoRanking(jogo, sim, rankingSim, rankingAtual) {
+  if (!rankingSim) return '';
+
+  const mapAtual = new Map(rankingAtual.map((r) => [r.participante.id, r.posicao]));
+
+  return `
+    <div class="panel simulacao-panel" style="margin-top:1rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <h3 class="panel__title simulacao-panel__title" style="margin:0;">
+          Ranking simulado — ${escapeHtml(jogo.codigo)}: ${formatarPlacar(sim.golsA, sim.golsB)}
+        </h3>
+        <button type="button" class="btn btn--secondary btn--sm" id="btn-limpar-simulacao">Limpar simulação</button>
+      </div>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem;">
+        Simulação hipotética: demais resultados oficiais permanecem inalterados.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pos.</th>
+              <th>Δ</th>
+              <th>Participante</th>
+              <th>Pontos</th>
+              <th>Exatos</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rankingSim.slice(0, 15).map((r) => {
+              const posAnt = mapAtual.get(r.participante.id);
+              const delta = posAnt != null ? posAnt - r.posicao : 0;
+              const deltaHtml =
+                delta > 0
+                  ? `<span style="color:var(--accent);">▲${delta}</span>`
+                  : delta < 0
+                    ? `<span style="color:var(--danger);">▼${Math.abs(delta)}</span>`
+                    : '—';
+              return `
+              <tr>
+                <td>${posBadge(r.posicao)}</td>
+                <td>${deltaHtml}</td>
+                <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
+                <td><strong>${r.pontosTotal}</strong></td>
+                <td>${r.placaresExatos}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>`;
 }
 
-function renderHeatmap(jogo, analise) {
-  const { matriz, maxGolsA, maxGolsB, maxContagem } = analise;
+function renderAnalisePossibilidades(container) {
+  if (!state.participantes.length) {
+    container.innerHTML =
+      '<div class="empty-state"><div class="empty-state__icon">📈</div><p>Cadastre participantes para calcular probabilidades.</p></div>';
+    return;
+  }
+
+  container.innerHTML =
+    '<div class="empty-state"><div class="spinner"></div><p>Calculando cenários...</p></div>';
+
+  setTimeout(() => {
+    const dados = calcularPossibilidadesVencer(
+      state.participantes,
+      state.jogos,
+      state.palpites
+    );
+
+    const metodo = dados.encerrado
+      ? 'Bolão encerrado — probabilidades baseadas no ranking final.'
+      : `Simulação Monte Carlo (${dados.iteracoes.toLocaleString('pt-BR')} cenários): cada jogo pendente sorteia um placar conforme a distribuição empírica dos palpites do bolão.`;
+
+    container.innerHTML = `
+      <div class="panel">
+        <h2 class="panel__title">Possibilidades de vencer o bolão</h2>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">${metodo}</p>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+          Jogos pendentes: <strong>${dados.jogosPendentes}</strong> ·
+          Critério de vitória: maior pontuação (desempate por exatos, vencedores, erros e nome).
+          Empates na liderança dividem a probabilidade.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Participante</th>
+                <th>Pos. atual</th>
+                <th>Pontos</th>
+                <th>P(vencer)</th>
+                <th>P(pódio)</th>
+                <th>P(top 10)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dados.resultados.map((r) => `
+                <tr>
+                  <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
+                  <td>${r.posicaoAtual != null ? posBadge(r.posicaoAtual) : '—'}</td>
+                  <td><strong>${r.pontosAtual}</strong></td>
+                  <td>${renderProbBar(r.probVencer, true)}</td>
+                  <td>${renderProbBar(r.probPodio)}</td>
+                  <td>${renderProbBar(r.probTop10)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }, 30);
+}
+
+function renderProbBar(pct, gold = false) {
+  const val = pct.toFixed(1);
+  return `
+    <div class="prob-bar-wrap">
+      <span style="min-width:3.5rem;text-align:right;font-weight:600;">${val}%</span>
+      <div class="prob-bar">
+        <div class="prob-bar__fill ${gold ? 'prob-bar__fill--gold' : ''}" style="width:${Math.min(pct, 100)}%;"></div>
+      </div>
+    </div>`;
+}
+
+function renderAnalisePlacarFavorito(container) {
+  const dados = calcularAnalisePlacarFavorito(
+    state.participantes,
+    state.jogos,
+    state.palpites
+  );
+  const v = dados.statsVirtual;
+
+  container.innerHTML = `
+    <div class="panel">
+      <h2 class="panel__title">Participante virtual — ${escapeHtml(PLACAR_FAVORITO_NOME)}</h2>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+        Em cada jogo, adota o placar mais palpitado pelo grupo (moda estatística).
+        Desempate: menor soma de gols, depois menor gols do mandante.
+      </p>
+      ${
+        v
+          ? `<div class="stats-grid" style="margin-bottom:1rem;">
+        <div class="stat-mini"><div class="stat-mini__val">${v.pontosTotal}</div><div class="stat-mini__lbl">Pontos</div></div>
+        <div class="stat-mini"><div class="stat-mini__val">${v.placaresExatos}</div><div class="stat-mini__lbl">Exatos</div></div>
+        <div class="stat-mini"><div class="stat-mini__val">${posBadge(dados.posicaoEntreHumanos)}</div><div class="stat-mini__lbl">Posição entre humanos</div></div>
+        <div class="stat-mini"><div class="stat-mini__val">${dados.resumo.aproveitamento}%</div><div class="stat-mini__lbl">Aproveitamento</div></div>
+      </div>`
+          : '<p>Nenhum palpite registrado.</p>'
+      }
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Ranking com ${escapeHtml(PLACAR_FAVORITO_NOME)}</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pos.</th><th>Participante</th><th>Pontos</th><th>Exatos</th><th>Vencedores</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dados.rankingComVirtual.slice(0, 20).map((r) => `
+              <tr class="${r.participante.id === PLACAR_FAVORITO_ID ? 'participante-virtual-row' : ''}">
+                <td>${posBadge(r.posicao)}</td>
+                <td><strong>${escapeHtml(getNomeParticipante(r.participante))}</strong></td>
+                <td><strong>${r.pontosTotal}</strong></td>
+                <td>${r.placaresExatos}</td>
+                <td>${r.acertosVencedor}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Placar favorito por jogo</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Jogo</th><th>Partida</th><th>Favorito</th><th>Votos</th><th>%</th><th>Oficial</th><th>Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dados.favoritos.map(({ jogo, gols_a, gols_b, votos, pct, pontos }) => `
+              <tr>
+                <td>${jogo.codigo}</td>
+                <td>${escapeHtml(jogo.time_a)} x ${escapeHtml(jogo.time_b)}</td>
+                <td><strong>${gols_a != null ? formatarPlacar(gols_a, gols_b) : '—'}</strong></td>
+                <td>${votos}</td>
+                <td>${pct}%</td>
+                <td>${jogoFinalizado(jogo) ? formatarPlacar(jogo.gols_a, jogo.gols_b) : '—'}</td>
+                <td>${pontos != null ? `<span class="pontos-badge ${pontosBadgeClass(pontos)}">${pontos}</span>` : '—'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderHeatmap(jogo, analise, simSelecionado) {
+  const { matriz, maxGols, maxContagem } = analise;
 
   let colHeads = '';
-  for (let b = 0; b <= maxGolsB; b++) {
+  for (let b = 0; b <= maxGols; b++) {
     colHeads += `<th class="heatmap-col-head">${b}</th>`;
   }
 
   let bodyRows = '';
-  for (let a = 0; a <= maxGolsA; a++) {
+  for (let a = 0; a <= maxGols; a++) {
     const sideLabel =
       a === 0
-        ? `<th class="heatmap-axis-side" rowspan="${maxGolsA + 1}">
+        ? `<th class="heatmap-axis-side" rowspan="${maxGols + 1}">
             <div class="heatmap-axis-team heatmap-axis-team--side">
               ${renderBandeira(jogo.time_a, 'team-flag team-flag--heatmap')}
               <span class="heatmap-axis-name">${escapeHtml(jogo.time_a)}</span>
@@ -521,19 +877,19 @@ function renderHeatmap(jogo, analise) {
           </th>`
         : '';
     let cells = sideLabel + `<th class="heatmap-row-head">${a}</th>`;
-    for (let b = 0; b <= maxGolsB; b++) {
-      cells += heatmapCell(matriz, a, b, maxContagem);
+    for (let b = 0; b <= maxGols; b++) {
+      cells += heatmapCell(matriz, a, b, maxContagem, simSelecionado);
     }
     bodyRows += `<tr>${cells}</tr>`;
   }
 
   return `
     <div class="heatmap-wrap">
-      <table class="heatmap-table">
+      <table class="heatmap-table heatmap-table--square">
         <thead>
           <tr>
             <th class="heatmap-corner" colspan="2"></th>
-            <th class="heatmap-axis-label" colspan="${maxGolsB + 1}">
+            <th class="heatmap-axis-label" colspan="${maxGols + 1}">
               <div class="heatmap-axis-team">
                 ${renderBandeira(jogo.time_b, 'team-flag team-flag--heatmap')}
                 <span class="heatmap-axis-name">${escapeHtml(jogo.time_b)}</span>
@@ -550,18 +906,26 @@ function renderHeatmap(jogo, analise) {
     </div>`;
 }
 
-function heatmapCell(matriz, a, b, maxContagem) {
+function heatmapCell(matriz, a, b, maxContagem, simSelecionado) {
   const count = matriz[`${a}-${b}`] || 0;
   const bg = corHeatmap(count, maxContagem);
   const style = bg ? `background:${bg};color:#1a1a1a;font-weight:700;` : '';
   const content = count === 0 ? '—' : count;
-  return `<td class="heatmap-cell ${count === 0 ? 'heatmap-cell--empty' : 'heatmap-cell--filled'}" style="${style}">${content}</td>`;
+  const selected =
+    simSelecionado &&
+    simSelecionado.golsA === a &&
+    simSelecionado.golsB === b;
+  return `<td class="heatmap-cell heatmap-cell--clickable ${count === 0 ? 'heatmap-cell--empty' : 'heatmap-cell--filled'} ${selected ? 'heatmap-cell--selected' : ''}" style="${style}" data-heatmap-cell data-gols-a="${a}" data-gols-b="${b}">${content}</td>`;
 }
 
-function renderListaPalpitesAnalise(analise) {
+function renderListaPalpitesAnalise(analise, rankingSim) {
   if (!analise.listaRanking.length) {
     return '<p style="color:var(--text-muted);font-size:0.85rem;">Nenhum palpite registrado para esta partida.</p>';
   }
+
+  const mapSim = rankingSim
+    ? new Map(rankingSim.map((r) => [r.participante.id, r]))
+    : null;
 
   return `
     <table>
@@ -572,20 +936,23 @@ function renderListaPalpitesAnalise(analise) {
           <th>Cidade</th>
           <th>Palpite</th>
           <th>Pontos no bolão</th>
+          ${rankingSim ? '<th>Pos. sim.</th>' : ''}
         </tr>
       </thead>
       <tbody>
         ${analise.listaRanking
-          .map(
-            ({ posicao, participante, palpite, pontosTotal }) => `
+          .map(({ posicao, participante, palpite, pontosTotal }) => {
+            const sim = mapSim?.get(participante.id);
+            return `
           <tr>
             <td>${posBadge(posicao)}</td>
             <td>${escapeHtml(participante.nome)}</td>
             <td>${escapeHtml(participante.cidade || '—')}</td>
             <td><strong>${formatarPlacar(palpite.gols_a, palpite.gols_b)}</strong></td>
-            <td>${pontosTotal}</td>
-          </tr>`
-          )
+            <td>${sim ? sim.pontosTotal : pontosTotal}</td>
+            ${rankingSim ? `<td>${sim ? posBadge(sim.posicao) : '—'}</td>` : ''}
+          </tr>`;
+          })
           .join('')}
       </tbody>
     </table>`;
@@ -738,11 +1105,65 @@ function renderAdmin() {
     $('#admin-login-panel').style.display = 'none';
     $('#admin-content').style.display = 'block';
     $('#toggle-bloqueio').checked = state.config.cadastro_bloqueado;
+    renderAdminAnalisesToggles();
     renderAdminJogos();
   } else {
     $('#admin-login-panel').style.display = 'block';
     $('#admin-content').style.display = 'none';
   }
+}
+
+function renderAdminAnalisesToggles() {
+  const container = $('#admin-analises-toggles');
+  if (!container) return;
+
+  container.innerHTML = TIPOS_ANALISE.map(
+    (t) => `
+    <div class="toggle-row admin-analise-toggle">
+      <div>
+        <strong>${escapeHtml(t.label)}</strong>
+        <p style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(t.desc)}</p>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-${t.id}" data-analise-config="${t.configKey}" ${state.config[t.configKey] !== false ? 'checked' : ''}>
+        <span class="toggle__slider"></span>
+      </label>
+    </div>`
+  ).join('');
+
+  container.querySelectorAll('[data-analise-config]').forEach((input) => {
+    input.addEventListener('change', async (e) => {
+      const key = e.target.dataset.analiseConfig;
+      const valor = e.target.checked;
+
+      if (!valor) {
+        const outrasAtivas = TIPOS_ANALISE.filter(
+          (t) => t.configKey !== key && state.config[t.configKey] !== false
+        );
+        if (!outrasAtivas.length) {
+          showToast('Mantenha pelo menos uma análise liberada.', 'error');
+          e.target.checked = true;
+          return;
+        }
+      }
+
+      try {
+        await atualizarConfiguracao({ [key]: valor });
+        state.config[key] = valor;
+        showToast(
+          valor ? `${TIPOS_ANALISE.find((t) => t.configKey === key)?.label} liberada.` : `${TIPOS_ANALISE.find((t) => t.configKey === key)?.label} bloqueada.`,
+          'success'
+        );
+        updateAnaliseNavVisibility();
+        if ($('#view-analise')?.classList.contains('view--active')) {
+          renderAnalise();
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+        e.target.checked = !valor;
+      }
+    });
+  });
 }
 
 function renderAdminJogos() {
@@ -877,7 +1298,6 @@ function setupForms() {
 
   $('#palpite-participante').addEventListener('change', () => renderPalpites());
   $('#filtro-grupo-palpites').addEventListener('change', () => renderPalpites());
-  $('#analise-jogo').addEventListener('change', () => renderAnalise());
 
   $('#btn-salvar-palpites').addEventListener('click', async () => {
     if (palpitesSomenteConsulta()) {

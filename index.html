@@ -95,14 +95,10 @@
 
     <!-- Análise de palpites -->
     <section class="view" id="view-analise">
-      <h1 class="page-title">Análise de Palpites</h1>
-      <p class="page-desc">Distribuição dos palpites para uma partida que ainda não ocorreu.</p>
-      <div class="filters">
-        <div class="form-group" style="flex:1;min-width:280px;">
-          <label for="analise-jogo">Partida</label>
-          <select id="analise-jogo"></select>
-        </div>
-      </div>
+      <h1 class="page-title">Análises</h1>
+      <p class="page-desc" id="analise-page-desc">Ferramentas estatísticas do bolão. Tipos disponíveis conforme liberação do administrador.</p>
+      <nav class="analise-subnav" id="analise-subnav" aria-label="Tipos de análise"></nav>
+      <div id="analise-filtros"></div>
       <div id="analise-conteudo"></div>
     </section>
 
@@ -178,6 +174,13 @@
               <span class="toggle__slider"></span>
             </label>
           </div>
+        </div>
+        <div class="panel" id="panel-analises-admin">
+          <h2 class="panel__title">Análises — acesso público</h2>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Libere ou bloqueie cada tipo de análise no menu Análises. Apenas os tipos ativos aparecem para os participantes.
+          </p>
+          <div id="admin-analises-toggles"></div>
         </div>
         <div class="panel">
           <h2 class="panel__title">Resultados Oficiais</h2>

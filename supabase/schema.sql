@@ -7,6 +7,9 @@
 CREATE TABLE IF NOT EXISTS configuracao (
   id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   cadastro_bloqueado BOOLEAN NOT NULL DEFAULT FALSE,
+  analise_palpites_jogo BOOLEAN NOT NULL DEFAULT TRUE,
+  analise_possibilidades_vencer BOOLEAN NOT NULL DEFAULT FALSE,
+  analise_placar_favorito BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

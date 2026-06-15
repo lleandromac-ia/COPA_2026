@@ -66,8 +66,15 @@ export async function carregarDados() {
   if (participantesRes.error) throw participantesRes.error;
   if (jogosRes.error) throw jogosRes.error;
 
+  const configBase = {
+    cadastro_bloqueado: false,
+    analise_palpites_jogo: true,
+    analise_possibilidades_vencer: false,
+    analise_placar_favorito: false,
+  };
+
   return {
-    config: configRes.data || { cadastro_bloqueado: false },
+    config: { ...configBase, ...(configRes.data || {}) },
     participantes: participantesRes.data || [],
     jogos: jogosRes.data || [],
     palpites,
@@ -135,11 +142,16 @@ export async function excluirResultadoJogo(jogoId) {
   return data;
 }
 
-export async function atualizarConfiguracao(cadastro_bloqueado) {
+export async function atualizarConfiguracao(updates) {
   const supabase = getSupabase();
+  const payload =
+    typeof updates === 'boolean'
+      ? { cadastro_bloqueado: updates }
+      : { ...updates };
+
   const { data, error } = await supabase
     .from('configuracao')
-    .update({ cadastro_bloqueado, updated_at: new Date().toISOString() })
+    .update({ ...payload, updated_at: new Date().toISOString() })
     .eq('id', 1)
     .select()
     .single();

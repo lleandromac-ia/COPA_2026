@@ -577,6 +577,13 @@ input[type='number'] {
   height: 18px;
 }
 
+.heatmap-table--square th,
+.heatmap-table--square td {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+}
+
 .heatmap-corner {
   background: var(--bg);
 }
@@ -622,6 +629,104 @@ input[type='number'] {
   box-shadow: var(--shadow);
   position: relative;
   z-index: 1;
+}
+
+.heatmap-cell--clickable {
+  cursor: pointer;
+}
+
+.heatmap-cell--selected {
+  outline: 3px solid var(--gold);
+  outline-offset: -2px;
+  transform: scale(1.08);
+  z-index: 2;
+  position: relative;
+}
+
+.heatmap-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+/* Sub-menu de análises */
+.analise-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.analise-subnav__btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.analise-subnav__btn:hover {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+
+.analise-subnav__btn--active {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.simulacao-panel {
+  border: 1px solid var(--gold);
+  background: rgba(255, 215, 0, 0.06);
+}
+
+.simulacao-panel__title {
+  color: var(--gold);
+}
+
+.prob-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.prob-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.prob-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  border-radius: 4px;
+}
+
+.prob-bar__fill--gold {
+  background: linear-gradient(90deg, #b8860b, var(--gold));
+}
+
+.admin-analise-toggle + .admin-analise-toggle {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.participante-virtual-row {
+  background: rgba(255, 215, 0, 0.08);
+}
+
+.participante-virtual-row td {
+  border-top: 2px solid var(--gold);
 }
 
 /* Admin — resultados responsivos */
