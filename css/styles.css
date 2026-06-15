@@ -729,6 +729,69 @@ input[type='number'] {
   border-top: 2px solid var(--gold);
 }
 
+/* Jogo com bandeiras (comparação, etc.) */
+.jogo-match {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.jogo-match__codigo {
+  font-size: 0.72rem;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.jogo-match__teams {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.jogo-match__team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.jogo-match__vs {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.admin-jogo-card__match {
+  margin-bottom: 1rem;
+}
+
+.admin-jogo-card__match .palpites-match {
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.admin-jogo-card__match .admin-jogo-card__x {
+  padding-bottom: 0;
+  align-self: center;
+}
+
+.admin-team-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-jogo-card__placar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: center;
+}
+
 /* Admin — resultados responsivos */
 .admin-jogos-list {
   display: grid;

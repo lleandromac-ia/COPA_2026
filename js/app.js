@@ -307,6 +307,27 @@ function posBadge(pos) {
   return `<span class="pos-badge ${cls}">${pos}</span>`;
 }
 
+function renderJogoComBandeiras(jogo, { showCodigo = true } = {}) {
+  const codigo = showCodigo
+    ? `<span class="jogo-match__codigo">${escapeHtml(jogo.codigo)}</span>`
+    : '';
+  return `
+    <div class="jogo-match">
+      ${codigo}
+      <div class="jogo-match__teams">
+        <span class="jogo-match__team">
+          ${renderBandeira(jogo.time_a)}
+          <span>${escapeHtml(jogo.time_a)}</span>
+        </span>
+        <span class="jogo-match__vs">x</span>
+        <span class="jogo-match__team">
+          ${renderBandeira(jogo.time_b)}
+          <span>${escapeHtml(jogo.time_b)}</span>
+        </span>
+      </div>
+    </div>`;
+}
+
 function pontosBadgeClass(pontos) {
   if (pontos === 12) return 'pontos-badge--12';
   if (pontos === 9) return 'pontos-badge--9';
@@ -796,7 +817,7 @@ function renderAnalisePossibilidadesExaustivas(container) {
       <h2 class="panel__title">Simulação pelos palpites próprios</h2>
       <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">${metodo}</p>
       <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
-        Ex.: se os resultados oficiais coincidirem com os palpites de Maurício Bispo dos Santos, ele faria a pontuação da coluna <strong>Final</strong> e ficaria na posição simulada.
+        Ex.: se os resultados oficiais coincidirem com os palpites de um jogador, ele faria a pontuação da coluna <strong>Final</strong> e ficaria na posição simulada.
         À medida que os jogos reais divergem dos palpites, essa projeção deixa de se aplicar.
         Posições empatadas na mesma pontuação compartilham a colocação.
       </p>
@@ -1112,7 +1133,7 @@ function renderComparacao() {
         </thead>
         <tbody>${comp.jogosComparados.filter((j) => jogoFinalizado(j.jogo)).map(({ jogo, palpite1, palpite2, pontos1, pontos2 }) => `
           <tr>
-            <td>${jogo.codigo}</td>
+            <td>${renderJogoComBandeiras(jogo)}</td>
             <td>${formatarPlacar(jogo.gols_a, jogo.gols_b)}</td>
             <td>${formatarPlacar(palpite1.gols_a, palpite1.gols_b)}</td>
             <td><span class="pontos-badge ${pontosBadgeClass(pontos1)}">${pontos1}</span></td>
@@ -1130,7 +1151,7 @@ function renderComparacao() {
           <thead><tr><th>Jogo</th><th>${escapeHtml(getNomeParticipante(p1))}</th><th>${escapeHtml(getNomeParticipante(p2))}</th></tr></thead>
           <tbody>${comp.divergencias.map(({ jogo, palpite1, palpite2 }) => `
             <tr>
-              <td>${jogo.codigo}</td>
+              <td>${renderJogoComBandeiras(jogo)}</td>
               <td>${formatarPlacar(palpite1.gols_a, palpite1.gols_b)}</td>
               <td>${formatarPlacar(palpite2.gols_a, palpite2.gols_b)}</td>
             </tr>`).join('')}
@@ -1264,24 +1285,37 @@ function renderAdminJogos() {
             <span>Grupo ${jogo.grupo} · Rodada ${jogo.rodada}</span>
             ${temResultado ? '<span class="resultado-badge resultado-badge--ok">Com resultado</span>' : '<span class="resultado-badge resultado-badge--pending">Sem resultado</span>'}
           </div>
+          <div class="admin-jogo-card__match">
+            <div class="palpites-match">
+              <div class="palpites-team palpites-team--home">
+                <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
+                ${renderBandeira(jogo.time_a)}
+              </div>
+              <span class="admin-jogo-card__x">x</span>
+              <div class="palpites-team palpites-team--away">
+                ${renderBandeira(jogo.time_b)}
+                <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
+              </div>
+            </div>
+          </div>
           <div class="admin-jogo-card__fields">
             <div class="form-group">
-              <label>Time A</label>
+              <label class="admin-team-label">${renderBandeira(jogo.time_a)} ${escapeHtml(jogo.time_a)}</label>
               <input type="text" value="${escapeHtml(jogo.time_a)}" data-field="time_a">
             </div>
             <div class="admin-jogo-card__placar">
               <div class="form-group">
-                <label>Gols A</label>
+                <label>${renderBandeira(jogo.time_a)} Gols</label>
                 <input type="number" min="0" max="20" value="${jogo.gols_a ?? ''}" data-field="gols_a" placeholder="—">
               </div>
               <span class="admin-jogo-card__x">x</span>
               <div class="form-group">
-                <label>Gols B</label>
+                <label>${renderBandeira(jogo.time_b)} Gols</label>
                 <input type="number" min="0" max="20" value="${jogo.gols_b ?? ''}" data-field="gols_b" placeholder="—">
               </div>
             </div>
             <div class="form-group">
-              <label>Time B</label>
+              <label class="admin-team-label">${renderBandeira(jogo.time_b)} ${escapeHtml(jogo.time_b)}</label>
               <input type="text" value="${escapeHtml(jogo.time_b)}" data-field="time_b">
             </div>
           </div>
