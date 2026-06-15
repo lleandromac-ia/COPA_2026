@@ -41,7 +41,7 @@ import {
   analisarPalpitesJogo,
   simularRankingComPlacar,
   calcularPossibilidadesVencer,
-  calcularPossibilidadesExaustivas,
+  calcularSimulacaoPalpitesProprios,
   calcularAnalisePlacarFavorito,
   corHeatmap,
   PLACAR_FAVORITO_ID,
@@ -777,80 +777,74 @@ function renderAnalisePossibilidades(container) {
 function renderAnalisePossibilidadesExaustivas(container) {
   if (!state.participantes.length) {
     container.innerHTML =
-      '<div class="empty-state"><div class="empty-state__icon">📈</div><p>Cadastre participantes para calcular probabilidades.</p></div>';
+      '<div class="empty-state"><div class="empty-state__icon">📈</div><p>Cadastre participantes para calcular simulações.</p></div>';
     return;
   }
 
-  container.innerHTML =
-    '<div class="empty-state"><div class="spinner"></div><p>Enumerando todos os cenários de placar...</p></div>';
+  const dados = calcularSimulacaoPalpitesProprios(
+    state.participantes,
+    state.jogos,
+    state.palpites
+  );
 
-  setTimeout(() => {
-    const dados = calcularPossibilidadesExaustivas(
-      state.participantes,
-      state.jogos,
-      state.palpites
-    );
+  const metodo = dados.encerrado
+    ? 'Bolão encerrado — posição e pontuação já são as finais.'
+    : `Para cada participante, simula-se que <strong>todos os ${dados.jogosPendentes} jogos pendentes</strong> terminem exatamente com os placares que ele palpitou. Os demais participantes pontuam conforme seus palpites nesses mesmos resultados.`;
 
-    if (dados.erro) {
-      container.innerHTML = `
-        <div class="panel">
-          <h2 class="panel__title">Probabilidade exaustiva</h2>
-          <div class="empty-state" style="padding:1.5rem 0;">
-            <div class="empty-state__icon">⚠️</div>
-            <p>${escapeHtml(dados.mensagem)}</p>
-          </div>
-        </div>`;
-      return;
-    }
-
-    const faixaGols =
-      dados.maxGols === 0
-        ? '0 x 0'
-        : `0 a ${dados.maxGols} gols por time (${dados.placaresPorJogo} placares/jogo)`;
-
-    const metodo = dados.encerrado
-      ? 'Bolão encerrado — probabilidades baseadas no ranking final.'
-      : `Enumeração exaustiva de <strong>${dados.totalCenarios.toLocaleString('pt-BR')}</strong> cenários equiprováveis: cada jogo pendente varia todos os placares ${faixaGols}. Conforme saem resultados oficiais, o universo diminui e as probabilidades se atualizam.`;
-
-    container.innerHTML = `
-      <div class="panel">
-        <h2 class="panel__title">Probabilidade exaustiva de placares</h2>
-        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">${metodo}</p>
-        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
-          Jogos pendentes: <strong>${dados.jogosPendentes}</strong> ·
-          Posições empatadas compartilham a mesma colocação.
-          A coluna <strong>Teto</strong> mostra a pontuação se todos os palpites restantes desse participante fossem placares exatos (12 pts cada).
-          À medida que os jogos avançam, esse teto cai e a probabilidade tende a diminuir.
-        </p>
-        <div class="table-wrap">
-          <table>
-            <thead>
+  container.innerHTML = `
+    <div class="panel">
+      <h2 class="panel__title">Simulação pelos palpites próprios</h2>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">${metodo}</p>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+        Ex.: se os resultados oficiais coincidirem com os palpites de Maurício Bispo dos Santos, ele faria a pontuação da coluna <strong>Final</strong> e ficaria na posição simulada.
+        À medida que os jogos reais divergem dos palpites, essa projeção deixa de se aplicar.
+        Posições empatadas na mesma pontuação compartilham a colocação.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Participante</th>
+              <th>Pos. atual</th>
+              <th>Pontos atuais</th>
+              <th>Pos. simulada</th>
+              <th>Pontos finais</th>
+              <th>Δ pos.</th>
+              <th>Imediatamente acima</th>
+              <th>Imediatamente abaixo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dados.resultados.map((r) => `
               <tr>
-                <th>Participante</th>
-                <th>Pos. atual</th>
-                <th>Pontos</th>
-                <th>Teto</th>
-                <th>P(vencer)</th>
-                <th>P(pódio)</th>
-                <th>P(top 10)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${dados.resultados.map((r) => `
-                <tr>
-                  <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
-                  <td>${r.posicaoAtual != null ? posBadge(r.posicaoAtual) : '—'}</td>
-                  <td><strong>${r.pontosAtual}</strong></td>
-                  <td>${r.pontosTeto}</td>
-                  <td>${renderProbBar(r.probVencer, true)}</td>
-                  <td>${renderProbBar(r.probPodio)}</td>
-                  <td>${renderProbBar(r.probTop10)}</td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-  }, 30);
+                <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
+                <td>${r.posicaoAtual != null ? posBadge(r.posicaoAtual) : '—'}</td>
+                <td>${r.pontosAtual}</td>
+                <td>${r.posicaoFinal != null ? posBadge(r.posicaoFinal) : '—'}</td>
+                <td><strong>${r.pontosFinal}</strong></td>
+                <td>${renderDeltaPosicao(r.deltaPosicao)}</td>
+                <td>${renderVizinhoSimulacao(r.vizinhoAcima, r.distPontosAcima, 'acima')}</td>
+                <td>${renderVizinhoSimulacao(r.vizinhoAbaixo, r.distPontosAbaixo, 'abaixo')}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDeltaPosicao(delta) {
+  if (delta == null || delta === 0) return '—';
+  if (delta > 0) return `<span style="color:var(--accent);">▲ ${delta}</span>`;
+  return `<span style="color:var(--danger);">▼ ${Math.abs(delta)}</span>`;
+}
+
+function renderVizinhoSimulacao(vizinho, distancia, tipo) {
+  if (!vizinho) {
+    return tipo === 'acima'
+      ? '<span style="color:var(--text-muted);">No topo</span>'
+      : '<span style="color:var(--text-muted);">No fim</span>';
+  }
+  return `${escapeHtml(getNomeParticipante(vizinho.participante))} · ${vizinho.pontosTotal} pts · <strong>${distancia} pts</strong> de distância`;
 }
 
 function renderProbBar(pct, gold = false) {
