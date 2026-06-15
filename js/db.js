@@ -70,6 +70,7 @@ export async function carregarDados() {
     cadastro_bloqueado: false,
     analise_palpites_jogo: true,
     analise_possibilidades_vencer: false,
+    analise_possibilidades_exaustivas: false,
     analise_placar_favorito: false,
   };
 

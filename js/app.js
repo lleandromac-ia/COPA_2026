@@ -41,6 +41,7 @@ import {
   analisarPalpitesJogo,
   simularRankingComPlacar,
   calcularPossibilidadesVencer,
+  calcularPossibilidadesExaustivas,
   calcularAnalisePlacarFavorito,
   corHeatmap,
   PLACAR_FAVORITO_ID,
@@ -52,6 +53,7 @@ let state = {
     cadastro_bloqueado: false,
     analise_palpites_jogo: true,
     analise_possibilidades_vencer: false,
+    analise_possibilidades_exaustivas: false,
     analise_placar_favorito: false,
   },
   participantes: [],
@@ -534,6 +536,8 @@ function renderAnalise() {
   filtros.innerHTML = '';
   if (analiseState.tipo === 'possibilidades_vencer') {
     renderAnalisePossibilidades(container);
+  } else if (analiseState.tipo === 'possibilidades_exaustivas') {
+    renderAnalisePossibilidadesExaustivas(container);
   } else if (analiseState.tipo === 'placar_favorito') {
     renderAnalisePlacarFavorito(container);
   }
@@ -759,6 +763,85 @@ function renderAnalisePossibilidades(container) {
                   <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
                   <td>${r.posicaoAtual != null ? posBadge(r.posicaoAtual) : '—'}</td>
                   <td><strong>${r.pontosAtual}</strong></td>
+                  <td>${renderProbBar(r.probVencer, true)}</td>
+                  <td>${renderProbBar(r.probPodio)}</td>
+                  <td>${renderProbBar(r.probTop10)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }, 30);
+}
+
+function renderAnalisePossibilidadesExaustivas(container) {
+  if (!state.participantes.length) {
+    container.innerHTML =
+      '<div class="empty-state"><div class="empty-state__icon">📈</div><p>Cadastre participantes para calcular probabilidades.</p></div>';
+    return;
+  }
+
+  container.innerHTML =
+    '<div class="empty-state"><div class="spinner"></div><p>Enumerando todos os cenários de placar...</p></div>';
+
+  setTimeout(() => {
+    const dados = calcularPossibilidadesExaustivas(
+      state.participantes,
+      state.jogos,
+      state.palpites
+    );
+
+    if (dados.erro) {
+      container.innerHTML = `
+        <div class="panel">
+          <h2 class="panel__title">Probabilidade exaustiva</h2>
+          <div class="empty-state" style="padding:1.5rem 0;">
+            <div class="empty-state__icon">⚠️</div>
+            <p>${escapeHtml(dados.mensagem)}</p>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const faixaGols =
+      dados.maxGols === 0
+        ? '0 x 0'
+        : `0 a ${dados.maxGols} gols por time (${dados.placaresPorJogo} placares/jogo)`;
+
+    const metodo = dados.encerrado
+      ? 'Bolão encerrado — probabilidades baseadas no ranking final.'
+      : `Enumeração exaustiva de <strong>${dados.totalCenarios.toLocaleString('pt-BR')}</strong> cenários equiprováveis: cada jogo pendente varia todos os placares ${faixaGols}. Conforme saem resultados oficiais, o universo diminui e as probabilidades se atualizam.`;
+
+    container.innerHTML = `
+      <div class="panel">
+        <h2 class="panel__title">Probabilidade exaustiva de placares</h2>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">${metodo}</p>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+          Jogos pendentes: <strong>${dados.jogosPendentes}</strong> ·
+          Posições empatadas compartilham a mesma colocação.
+          A coluna <strong>Teto</strong> mostra a pontuação se todos os palpites restantes desse participante fossem placares exatos (12 pts cada).
+          À medida que os jogos avançam, esse teto cai e a probabilidade tende a diminuir.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Participante</th>
+                <th>Pos. atual</th>
+                <th>Pontos</th>
+                <th>Teto</th>
+                <th>P(vencer)</th>
+                <th>P(pódio)</th>
+                <th>P(top 10)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dados.resultados.map((r) => `
+                <tr>
+                  <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
+                  <td>${r.posicaoAtual != null ? posBadge(r.posicaoAtual) : '—'}</td>
+                  <td><strong>${r.pontosAtual}</strong></td>
+                  <td>${r.pontosTeto}</td>
                   <td>${renderProbBar(r.probVencer, true)}</td>
                   <td>${renderProbBar(r.probPodio)}</td>
                   <td>${renderProbBar(r.probTop10)}</td>

@@ -23,7 +23,13 @@ export const TIPOS_ANALISE = [
     id: 'possibilidades_vencer',
     configKey: 'analise_possibilidades_vencer',
     label: 'Possibilidades de vencer bolão',
-    desc: 'Simulação estatística dos cenários restantes e probabilidade de vitória.',
+    desc: 'Simulação Monte Carlo: sorteia placares conforme a distribuição dos palpites.',
+  },
+  {
+    id: 'possibilidades_exaustivas',
+    configKey: 'analise_possibilidades_exaustivas',
+    label: 'Probabilidade exaustiva',
+    desc: 'Enumera todos os placares possíveis nos jogos restantes (cenários equiprováveis).',
   },
   {
     id: 'placar_favorito',
@@ -37,6 +43,7 @@ export const PLACAR_FAVORITO_ID = '__placar_favorito__';
 export const PLACAR_FAVORITO_NOME = 'Placar Favorito';
 
 const MONTE_CARLO_ITERACOES = 3000;
+const MAX_CENARIOS_EXAUSTIVOS = 2_000_000;
 
 export function getAnalisesHabilitadas(config) {
   return TIPOS_ANALISE.filter((t) => config[t.configKey] !== false);
@@ -346,6 +353,241 @@ function buildResultadoPossibilidades(
       })
       .sort((a, b) => b.probVencer - a.probVencer || a.posicaoAtual - b.posicaoAtual),
     encerrado,
+  };
+}
+
+function gerarPlacaresPossiveis(maxGols) {
+  const list = [];
+  for (let a = 0; a <= maxGols; a++) {
+    for (let b = 0; b <= maxGols; b++) {
+      list.push({ gols_a: a, gols_b: b });
+    }
+  }
+  return list;
+}
+
+function escolherMaxGolsParaEnumeracao(numJogos, maxCenarios = MAX_CENARIOS_EXAUSTIVOS) {
+  if (numJogos === 0) return { maxGols: 0, totalCenarios: 1, placaresPorJogo: 1 };
+  for (let g = 5; g >= 0; g--) {
+    const placaresPorJogo = (g + 1) ** 2;
+    const totalCenarios = placaresPorJogo ** numJogos;
+    if (totalCenarios <= maxCenarios) {
+      return { maxGols: g, totalCenarios, placaresPorJogo };
+    }
+  }
+  return null;
+}
+
+function calcularPontosTetoPalpitesPerfeitos(participanteId, pontosAtual, jogosPendentes, palpitesMap) {
+  let teto = pontosAtual;
+  for (const jogo of jogosPendentes) {
+    if (palpitesMap.has(`${participanteId}:${jogo.id}`)) teto += 12;
+  }
+  return teto;
+}
+
+function avaliarCenarioRanking(baseStats, pontosAddPorParticipante) {
+  const rankingSim = baseStats.map((b, i) => ({
+    participante: b.participante,
+    pontosTotal: b.pontosTotal + pontosAddPorParticipante[i].pontos,
+    placaresExatos: b.placaresExatos + pontosAddPorParticipante[i].exatos,
+    acertosVencedor: b.acertosVencedor + pontosAddPorParticipante[i].vencedores,
+    erros: b.erros + pontosAddPorParticipante[i].erros,
+    jogosAvaliados: b.jogosAvaliados,
+    aproveitamento: b.aproveitamento,
+  }));
+  rankingSim.sort(compararRankingItens);
+  return atribuirPosicoesRanking(rankingSim);
+}
+
+function registrarContagens(rankingComPos, vitorias, podio, top10) {
+  const vencedores = determinarVencedoresRanking(rankingComPos);
+  const share = 1 / vencedores.length;
+  for (const v of vencedores) {
+    vitorias.set(v.participante.id, (vitorias.get(v.participante.id) || 0) + share);
+  }
+  rankingComPos.filter((r) => r.posicao <= 3).forEach((r) => {
+    podio.set(r.participante.id, (podio.get(r.participante.id) || 0) + 1);
+  });
+  rankingComPos.filter((r) => r.posicao <= 10).forEach((r) => {
+    top10.set(r.participante.id, (top10.get(r.participante.id) || 0) + 1);
+  });
+}
+
+/**
+ * Enumera todos os placares possíveis (0..N gols por time) nos jogos pendentes.
+ * Cada combinação de resultados tem peso igual — probabilidade = frequência nos cenários.
+ */
+export function calcularPossibilidadesExaustivas(participantes, jogos, palpites) {
+  const palpitesMap = new Map(
+    palpites.map((p) => [`${p.participante_id}:${p.jogo_id}`, p])
+  );
+
+  const jogosFinalizados = jogos.filter(jogoFinalizado);
+  const jogosPendentes = jogos.filter((j) => !jogoFinalizado(j));
+  const rankingAtual = calcularRanking(participantes, jogos, palpites);
+
+  const vitorias = new Map(participantes.map((p) => [p.id, 0]));
+  const podio = new Map(participantes.map((p) => [p.id, 0]));
+  const top10 = new Map(participantes.map((p) => [p.id, 0]));
+
+  const baseStats = participantes.map((p) => ({
+    participante: p,
+    ...calcularEstatisticasParticipante(p.id, jogosFinalizados, palpitesMap),
+  }));
+
+  const pontosTeto = new Map(
+    participantes.map((p) => {
+      const r = rankingAtual.find((x) => x.participante.id === p.id);
+      return [
+        p.id,
+        calcularPontosTetoPalpitesPerfeitos(
+          p.id,
+          r?.pontosTotal ?? 0,
+          jogosPendentes,
+          palpitesMap
+        ),
+      ];
+    })
+  );
+
+  if (!jogosPendentes.length) {
+    registrarContagens(rankingAtual, vitorias, podio, top10);
+    return buildResultadoPossibilidadesExaustivas({
+      participantes,
+      rankingAtual,
+      vitorias,
+      podio,
+      top10,
+      totalCenarios: 1,
+      jogosPendentes: 0,
+      maxGols: 0,
+      encerrado: true,
+      pontosTeto,
+    });
+  }
+
+  const config = escolherMaxGolsParaEnumeracao(jogosPendentes.length);
+  if (!config) {
+    return {
+      erro: true,
+      jogosPendentes: jogosPendentes.length,
+      rankingAtual,
+      mensagem: `Com ${jogosPendentes.length} jogos pendentes, a enumeração completa de placares ultrapassa o limite de cálculo (${MAX_CENARIOS_EXAUSTIVOS.toLocaleString('pt-BR')} cenários). Aguarde mais resultados oficiais ou use a análise Monte Carlo.`,
+    };
+  }
+
+  const { maxGols, totalCenarios, placaresPorJogo } = config;
+  const outcomesPorJogo = jogosPendentes.map(() => gerarPlacaresPossiveis(maxGols));
+
+  const pontosMatriz = outcomesPorJogo.map((outcomes, gi) => {
+    const jogo = jogosPendentes[gi];
+    return outcomes.map((outcome) =>
+      participantes.map((p) => {
+        const palpite = palpitesMap.get(`${p.id}:${jogo.id}`);
+        if (!palpite) return { pontos: 0, exatos: 0, vencedores: 0, erros: 0 };
+        const pts = calcularPontos(
+          palpite.gols_a,
+          palpite.gols_b,
+          outcome.gols_a,
+          outcome.gols_b
+        );
+        return {
+          pontos: pts,
+          exatos: pts === 12 ? 1 : 0,
+          vencedores: pts >= 5 ? 1 : 0,
+          erros: pts === 0 ? 1 : 0,
+        };
+      })
+    );
+  });
+
+  const indices = new Array(jogosPendentes.length).fill(0);
+  const addBuffer = participantes.map(() => ({ pontos: 0, exatos: 0, vencedores: 0, erros: 0 }));
+
+  for (let c = 0; c < totalCenarios; c++) {
+    for (let pi = 0; pi < participantes.length; pi++) {
+      addBuffer[pi].pontos = 0;
+      addBuffer[pi].exatos = 0;
+      addBuffer[pi].vencedores = 0;
+      addBuffer[pi].erros = 0;
+    }
+
+    for (let gi = 0; gi < jogosPendentes.length; gi++) {
+      const row = pontosMatriz[gi][indices[gi]];
+      for (let pi = 0; pi < participantes.length; pi++) {
+        addBuffer[pi].pontos += row[pi].pontos;
+        addBuffer[pi].exatos += row[pi].exatos;
+        addBuffer[pi].vencedores += row[pi].vencedores;
+        addBuffer[pi].erros += row[pi].erros;
+      }
+    }
+
+    registrarContagens(
+      avaliarCenarioRanking(baseStats, addBuffer),
+      vitorias,
+      podio,
+      top10
+    );
+
+    let d = jogosPendentes.length - 1;
+    while (d >= 0) {
+      indices[d]++;
+      if (indices[d] < outcomesPorJogo[d].length) break;
+      indices[d] = 0;
+      d--;
+    }
+  }
+
+  return buildResultadoPossibilidadesExaustivas({
+    participantes,
+    rankingAtual,
+    vitorias,
+    podio,
+    top10,
+    totalCenarios,
+    jogosPendentes: jogosPendentes.length,
+    maxGols,
+    placaresPorJogo,
+    encerrado: false,
+    pontosTeto,
+  });
+}
+
+function buildResultadoPossibilidadesExaustivas({
+  participantes,
+  rankingAtual,
+  vitorias,
+  podio,
+  top10,
+  totalCenarios,
+  jogosPendentes,
+  maxGols,
+  placaresPorJogo,
+  encerrado,
+  pontosTeto,
+}) {
+  return {
+    totalCenarios,
+    jogosPendentes,
+    maxGols,
+    placaresPorJogo,
+    rankingAtual,
+    encerrado,
+    resultados: participantes
+      .map((p) => {
+        const r = rankingAtual.find((x) => x.participante.id === p.id);
+        return {
+          participante: p,
+          posicaoAtual: r?.posicao ?? null,
+          pontosAtual: r?.pontosTotal ?? 0,
+          pontosTeto: pontosTeto.get(p.id) ?? r?.pontosTotal ?? 0,
+          probVencer: ((vitorias.get(p.id) || 0) / totalCenarios) * 100,
+          probPodio: ((podio.get(p.id) || 0) / totalCenarios) * 100,
+          probTop10: ((top10.get(p.id) || 0) / totalCenarios) * 100,
+        };
+      })
+      .sort((a, b) => b.probVencer - a.probVencer || a.posicaoAtual - b.posicaoAtual),
   };
 }
 
