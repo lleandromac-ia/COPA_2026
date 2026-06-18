@@ -943,6 +943,157 @@ input[type='number'] {
   object-fit: cover;
 }
 
+.perfil-panel {
+  overflow: hidden;
+}
+
+.perfil-header__nome {
+  font-size: 1.35rem;
+  margin-bottom: 0.2rem;
+}
+
+.perfil-header__cidade {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.perfil-destaque {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.perfil-destaque-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.perfil-destaque-card--pontos {
+  border-color: rgba(0, 200, 83, 0.35);
+  background: rgba(0, 200, 83, 0.06);
+}
+
+.perfil-destaque-card--ranking {
+  border-color: rgba(255, 215, 0, 0.35);
+  background: rgba(255, 215, 0, 0.06);
+}
+
+.perfil-destaque__lbl {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.perfil-destaque__val {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--accent);
+}
+
+.perfil-destaque-card--ranking .perfil-destaque__val {
+  color: var(--gold);
+}
+
+.perfil-destaque__val--sm {
+  font-size: 1.75rem;
+}
+
+.perfil-destaque__sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.perfil-stats-secundarias {
+  margin-top: 0.5rem;
+}
+
+.perfil-row--pendente {
+  opacity: 0.85;
+}
+
+/* Gráfico evolução de pontos */
+.evolucao-chart {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1px solid var(--border);
+}
+
+.evolucao-chart--empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 2rem 1rem;
+}
+
+.evolucao-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.evolucao-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.evolucao-chart__legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.evolucao-chart__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.evolucao-chart__grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.evolucao-chart__axis {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.evolucao-chart__line {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.evolucao-chart__dot {
+  stroke-width: 2;
+}
+
+.evolucao-chart__axis-y,
+.evolucao-chart__axis-x {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font);
+}
+
+.evolucao-chart__axis-title {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

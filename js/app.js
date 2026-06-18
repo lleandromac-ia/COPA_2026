@@ -30,8 +30,10 @@ import {
   formatarDataJogo,
   formatarHoraJogo,
   numeroJogo,
+  isJogoDiaAnterior,
 } from './utils.js';
 import { renderBandeira } from './flags.js';
+import { buildEvolucaoPontos, renderGraficoEvolucao } from './charts.js';
 import { setupImportacao } from './import-ui.js';
 import {
   TIPOS_ANALISE,
@@ -64,6 +66,10 @@ let state = {
 const analiseState = {
   tipo: null,
   simulacao: null,
+};
+
+const adminUi = {
+  ocultarJogosAnteriores: true,
 };
 
 const palpitesPendentes = new Map();
@@ -1086,6 +1092,58 @@ function renderRanking() {
     </table>`;
 }
 
+function renderTabelaPalpitesParticipante(participanteId, { apenasRealizados = false } = {}) {
+  const palpitesMap = new Map(
+    state.palpites
+      .filter((p) => p.participante_id === participanteId)
+      .map((p) => [p.jogo_id, p])
+  );
+
+  const jogosComPalpite = state.jogos
+    .filter((j) => palpitesMap.has(j.id))
+    .filter((j) => !apenasRealizados || jogoFinalizado(j))
+    .sort(
+      (a, b) =>
+        (a.ordem || 0) - (b.ordem || 0) ||
+        new Date(a.data_jogo || 0) - new Date(b.data_jogo || 0) ||
+        a.codigo.localeCompare(b.codigo)
+    );
+
+  if (!jogosComPalpite.length) {
+    return '<p style="color:var(--text-muted);font-size:0.85rem;">Nenhum palpite registrado.</p>';
+  }
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Partida</th>
+          <th>Resultado oficial</th>
+          <th>Palpite</th>
+          <th>Pontos</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${jogosComPalpite
+          .map((jogo) => {
+            const palpite = palpitesMap.get(jogo.id);
+            const finalizado = jogoFinalizado(jogo);
+            const pontos = finalizado
+              ? calcularPontos(palpite.gols_a, palpite.gols_b, jogo.gols_a, jogo.gols_b)
+              : null;
+            return `
+          <tr class="${finalizado ? '' : 'perfil-row--pendente'}">
+            <td>${renderJogoComBandeiras(jogo)}</td>
+            <td>${finalizado ? formatarPlacar(jogo.gols_a, jogo.gols_b) : '<span style="color:var(--text-muted)">Pendente</span>'}</td>
+            <td><strong>${formatarPlacar(palpite.gols_a, palpite.gols_b)}</strong></td>
+            <td>${pontos !== null ? `<span class="pontos-badge ${pontosBadgeClass(pontos)}">${pontos}</span>` : '—'}</td>
+          </tr>`;
+          })
+          .join('')}
+      </tbody>
+    </table>`;
+}
+
 function renderComparacao() {
   const container = $('#comparacao-resultado');
   const id1 = $('#comp-p1').value;
@@ -1105,6 +1163,19 @@ function renderComparacao() {
   const p2 = state.participantes.find((p) => p.id === id2);
   const comp = compararParticipantes(id1, id2, state.jogos, state.palpites);
 
+  const evolucaoSeries = [
+    {
+      label: getNomeParticipante(p1),
+      color: '#29b6f6',
+      pontos: buildEvolucaoPontos(id1, state.jogos, state.palpites),
+    },
+    {
+      label: getNomeParticipante(p2),
+      color: '#00c853',
+      pontos: buildEvolucaoPontos(id2, state.jogos, state.palpites),
+    },
+  ];
+
   container.innerHTML = `
     <h3 class="panel__title">Resumo</h3>
     <div class="table-wrap" style="margin-bottom:1.5rem;">
@@ -1123,6 +1194,11 @@ function renderComparacao() {
       <div class="stat-mini"><div class="stat-mini__val">${comp.resumo.palpitesIguais}</div><div class="stat-mini__lbl">Palpites Iguais</div></div>
       <div class="stat-mini"><div class="stat-mini__val">${comp.resumo.palpitesDiferentes}</div><div class="stat-mini__lbl">Palpites Diferentes</div></div>
       <div class="stat-mini"><div class="stat-mini__val">${comp.resumo.maisPontos === 1 ? escapeHtml(getNomeParticipante(p1)) : comp.resumo.maisPontos === 2 ? escapeHtml(getNomeParticipante(p2)) : 'Empate'}</div><div class="stat-mini__lbl">Mais Pontos</div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <h3 class="panel__title">Evolução de pontos — jogo a jogo</h3>
+      ${renderGraficoEvolucao(evolucaoSeries)}
     </div>
 
     <h3 class="panel__title">Comparação Jogo a Jogo</h3>
@@ -1176,26 +1252,104 @@ function renderPerfil() {
     state.palpites.filter((p) => p.participante_id === id).map((p) => [`${id}:${p.jogo_id}`, p])
   );
   const stats = calcularEstatisticasParticipante(id, state.jogos, palpitesMap);
+  const evolucao = buildEvolucaoPontos(id, state.jogos, state.palpites);
+
+  const jogosRealizados = state.jogos.filter(
+    (j) => jogoFinalizado(j) && state.palpites.some((p) => p.participante_id === id && p.jogo_id === j.id)
+  ).length;
+  const jogosPendentes = state.palpites.filter((p) => p.participante_id === id).length - jogosRealizados;
 
   container.innerHTML = `
-    <div class="panel">
+    <div class="panel perfil-panel">
       <div class="perfil-header">
         <div class="perfil-avatar">👤</div>
-        <div>
-          <h2 style="font-size:1.25rem;">${escapeHtml(participante.nome)}</h2>
-          <p style="color:var(--text-muted);">${escapeHtml(participante.cidade || '—')}</p>
-          ${posicao ? `<p style="margin-top:0.35rem;">${posBadge(posicao.posicao)} <strong>${posicao.pontosTotal} pontos</strong></p>` : ''}
+        <div class="perfil-header__info">
+          <h2 class="perfil-header__nome">${escapeHtml(participante.nome)}</h2>
+          <p class="perfil-header__cidade">${escapeHtml(participante.cidade || '—')}</p>
         </div>
       </div>
-      <div class="stats-grid">
-        <div class="stat-mini"><div class="stat-mini__val">${stats.pontosTotal}</div><div class="stat-mini__lbl">Pontuação Total</div></div>
-        <div class="stat-mini"><div class="stat-mini__val">${stats.placaresExatos}</div><div class="stat-mini__lbl">Placares Exatos</div></div>
-        <div class="stat-mini"><div class="stat-mini__val">${stats.acertosVencedor}</div><div class="stat-mini__lbl">Acertos Vencedor</div></div>
-        <div class="stat-mini"><div class="stat-mini__val">${stats.jogosAvaliados}</div><div class="stat-mini__lbl">Jogos Avaliados</div></div>
-        <div class="stat-mini"><div class="stat-mini__val">${stats.aproveitamento}%</div><div class="stat-mini__lbl">Aproveitamento</div></div>
-        <div class="stat-mini"><div class="stat-mini__val">${stats.erros}</div><div class="stat-mini__lbl">Erros</div></div>
+
+      <div class="perfil-destaque">
+        <div class="perfil-destaque-card perfil-destaque-card--pontos">
+          <span class="perfil-destaque__lbl">Pontuação atual</span>
+          <span class="perfil-destaque__val">${stats.pontosTotal}</span>
+          <span class="perfil-destaque__sub">${jogosRealizados} jogo(s) avaliado(s)</span>
+        </div>
+        <div class="perfil-destaque-card perfil-destaque-card--ranking">
+          <span class="perfil-destaque__lbl">Ranking atual</span>
+          <span class="perfil-destaque__val">${posicao ? `${posicao.posicao}º` : '—'}</span>
+          <span class="perfil-destaque__sub">${state.participantes.length} participantes</span>
+        </div>
+        <div class="perfil-destaque-card">
+          <span class="perfil-destaque__lbl">Placares exatos</span>
+          <span class="perfil-destaque__val perfil-destaque__val--sm">${stats.placaresExatos}</span>
+          <span class="perfil-destaque__sub">Aproveitamento ${stats.aproveitamento}%</span>
+        </div>
       </div>
+
+      <div class="stats-grid perfil-stats-secundarias">
+        <div class="stat-mini"><div class="stat-mini__val">${stats.acertosVencedor}</div><div class="stat-mini__lbl">Acertos Vencedor</div></div>
+        <div class="stat-mini"><div class="stat-mini__val">${stats.erros}</div><div class="stat-mini__lbl">Erros</div></div>
+        <div class="stat-mini"><div class="stat-mini__val">${jogosPendentes}</div><div class="stat-mini__lbl">Jogos pendentes</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Evolução de pontos — jogo a jogo</h2>
+      ${renderGraficoEvolucao([{ label: getNomeParticipante(participante), color: '#29b6f6', pontos: evolucao }])}
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Palpites — jogos realizados</h2>
+      <div class="table-wrap">${renderTabelaPalpitesParticipante(id, { apenasRealizados: true })}</div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">Palpites — jogos pendentes</h2>
+      <div class="table-wrap">${renderTabelaPalpitesPendentes(id)}</div>
     </div>`;
+}
+
+function renderTabelaPalpitesPendentes(participanteId) {
+  const palpitesMap = new Map(
+    state.palpites
+      .filter((p) => p.participante_id === participanteId)
+      .map((p) => [p.jogo_id, p])
+  );
+
+  const jogos = state.jogos
+    .filter((j) => palpitesMap.has(j.id) && !jogoFinalizado(j))
+    .sort(
+      (a, b) =>
+        (a.ordem || 0) - (b.ordem || 0) ||
+        new Date(a.data_jogo || 0) - new Date(b.data_jogo || 0) ||
+        a.codigo.localeCompare(b.codigo)
+    );
+
+  if (!jogos.length) {
+    return '<p style="color:var(--text-muted);font-size:0.85rem;">Nenhum jogo pendente com palpite.</p>';
+  }
+
+  return `
+    <table>
+      <thead>
+        <tr><th>Partida</th><th>Data</th><th>Hora</th><th>Palpite</th></tr>
+      </thead>
+      <tbody>
+        ${jogos
+          .map((jogo) => {
+            const palpite = palpitesMap.get(jogo.id);
+            return `
+          <tr>
+            <td>${renderJogoComBandeiras(jogo)}</td>
+            <td>${formatarDataJogo(jogo.data_jogo)}</td>
+            <td>${formatarHoraJogo(jogo.data_jogo)}</td>
+            <td><strong>${formatarPlacar(palpite.gols_a, palpite.gols_b)}</strong></td>
+          </tr>`;
+          })
+          .join('')}
+      </tbody>
+    </table>`;
 }
 
 function renderAdmin() {
@@ -1267,12 +1421,32 @@ function renderAdminAnalisesToggles() {
 function renderAdminJogos() {
   const grupoFiltro = $('#filtro-grupo-admin').value;
   const rodadaFiltro = $('#filtro-rodada-admin').value;
+  const btnToggle = $('#btn-toggle-jogos-anteriores');
+  if (btnToggle) {
+    btnToggle.textContent = adminUi.ocultarJogosAnteriores
+      ? 'Exibir jogos de dias anteriores'
+      : 'Ocultar jogos de dias anteriores';
+    btnToggle.classList.toggle('btn--primary', adminUi.ocultarJogosAnteriores);
+    btnToggle.classList.toggle('btn--secondary', !adminUi.ocultarJogosAnteriores);
+  }
 
   const jogosFiltrados = state.jogos.filter((j) => {
     if (grupoFiltro && j.grupo !== grupoFiltro) return false;
     if (rodadaFiltro && String(j.rodada) !== rodadaFiltro) return false;
+    if (adminUi.ocultarJogosAnteriores && isJogoDiaAnterior(j)) return false;
     return true;
   });
+
+  if (!jogosFiltrados.length) {
+    $('#admin-jogos').innerHTML = `
+      <div class="empty-state" style="padding:1.5rem 0;">
+        <p style="color:var(--text-muted);font-size:0.85rem;">
+          Nenhum jogo para exibir com os filtros atuais.
+          ${adminUi.ocultarJogosAnteriores ? ' Clique em "Exibir jogos de dias anteriores" para ver partidas passadas.' : ''}
+        </p>
+      </div>`;
+    return;
+  }
 
   $('#admin-jogos').innerHTML = `
     <div class="admin-jogos-list">
@@ -1506,6 +1680,11 @@ function setupForms() {
 
   $('#filtro-grupo-admin').addEventListener('change', () => renderAdminJogos());
   $('#filtro-rodada-admin').addEventListener('change', () => renderAdminJogos());
+
+  $('#btn-toggle-jogos-anteriores')?.addEventListener('click', () => {
+    adminUi.ocultarJogosAnteriores = !adminUi.ocultarJogosAnteriores;
+    renderAdminJogos();
+  });
 
   setupImportacao();
 

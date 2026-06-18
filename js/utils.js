@@ -107,3 +107,24 @@ export function numeroJogo(codigo) {
   const match = String(codigo || '').match(/(\d{2})$/);
   return match ? match[1] : codigo;
 }
+
+/** Chave YYYY-MM-DD no fuso de Brasília. */
+export function chaveDiaBrasil(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSO_BRASIL,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+/** Jogo em dia anterior ao de hoje (horário de Brasília). */
+export function isJogoDiaAnterior(jogo) {
+  if (!jogo?.data_jogo) return false;
+  const hoje = chaveDiaBrasil(new Date().toISOString());
+  const dia = chaveDiaBrasil(jogo.data_jogo);
+  return hoje && dia && dia < hoje;
+}

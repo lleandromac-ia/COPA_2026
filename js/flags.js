@@ -14,7 +14,7 @@ const PAIS_PARA_ISO = {
   'Canadá': 'ca',
   'Catar': 'qa',
   'Colômbia': 'co',
-  'Congo': 'cg',
+  'Congo': 'cd',
   'Coréia do Sul': 'kr',
   'Costa do Marfim': 'ci',
   'Croácia': 'hr',
