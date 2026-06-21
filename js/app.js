@@ -33,7 +33,13 @@ import {
   isJogoDiaAnterior,
 } from './utils.js';
 import { renderBandeira } from './flags.js';
-import { buildEvolucaoPontos, renderGraficoEvolucao } from './charts.js';
+import {
+  buildEvolucaoPontos,
+  buildEvolucaoPosicao,
+  renderGraficoEvolucao,
+  renderGraficoEvolucaoPosicao,
+  setupEvolucaoCharts,
+} from './charts.js';
 import { setupImportacao } from './import-ui.js';
 import {
   TIPOS_ANALISE,
@@ -1239,6 +1245,18 @@ function renderComparacao() {
       pontos: buildEvolucaoPontos(id2, state.jogos, state.palpites),
     },
   ];
+  const posicaoSeries = [
+    {
+      label: getNomeParticipante(p1),
+      color: '#29b6f6',
+      pontos: buildEvolucaoPosicao(id1, state.participantes, state.jogos, state.palpites),
+    },
+    {
+      label: getNomeParticipante(p2),
+      color: '#00c853',
+      pontos: buildEvolucaoPosicao(id2, state.participantes, state.jogos, state.palpites),
+    },
+  ];
 
   container.innerHTML = `
     <h3 class="panel__title">Resumo</h3>
@@ -1263,6 +1281,11 @@ function renderComparacao() {
     <div class="panel" style="margin-bottom:1.5rem;">
       <h3 class="panel__title">Evolução de pontos — jogo a jogo</h3>
       ${renderGraficoEvolucao(evolucaoSeries)}
+    </div>
+
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <h3 class="panel__title">Evolução de posição — jogo a jogo</h3>
+      ${renderGraficoEvolucaoPosicao(posicaoSeries, { maxPosicao: state.participantes.length })}
     </div>
 
     <h3 class="panel__title">Comparação Jogo a Jogo</h3>
@@ -1298,6 +1321,8 @@ function renderComparacao() {
           </tbody>
         </table>` : '<p style="color:var(--text-muted);font-size:0.85rem;">Nenhuma divergência encontrada.</p>'}
     </div>`;
+
+  setupEvolucaoCharts(container);
 }
 
 function renderPerfil() {
@@ -1317,6 +1342,12 @@ function renderPerfil() {
   );
   const stats = calcularEstatisticasParticipante(id, state.jogos, palpitesMap);
   const evolucao = buildEvolucaoPontos(id, state.jogos, state.palpites);
+  const evolucaoPosicao = buildEvolucaoPosicao(
+    id,
+    state.participantes,
+    state.jogos,
+    state.palpites
+  );
 
   const jogosRealizados = state.jogos.filter(
     (j) => jogoFinalizado(j) && state.palpites.some((p) => p.participante_id === id && p.jogo_id === j.id)
@@ -1364,6 +1395,11 @@ function renderPerfil() {
     </div>
 
     <div class="panel">
+      <h2 class="panel__title">Evolução de posição — jogo a jogo</h2>
+      ${renderGraficoEvolucaoPosicao([{ label: getNomeParticipante(participante), color: '#29b6f6', pontos: evolucaoPosicao }], { maxPosicao: state.participantes.length })}
+    </div>
+
+    <div class="panel">
       <h2 class="panel__title">Palpites — jogos realizados</h2>
       <div class="table-wrap">${renderTabelaPalpitesParticipante(id, { apenasRealizados: true })}</div>
     </div>
@@ -1372,6 +1408,8 @@ function renderPerfil() {
       <h2 class="panel__title">Palpites — jogos pendentes</h2>
       <div class="table-wrap">${renderTabelaPalpitesPendentes(id)}</div>
     </div>`;
+
+  setupEvolucaoCharts(container);
 }
 
 function renderTabelaPalpitesPendentes(participanteId) {
