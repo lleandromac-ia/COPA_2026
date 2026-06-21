@@ -832,11 +832,13 @@ function ordenarResultadosSimulacaoPalpites(resultados, criterio) {
     lista.sort((a, b) => {
       const distA = a.distPontosAbaixo;
       const distB = b.distPontosAbaixo;
-      if (distA == null && distB == null) return 0;
+      if (distA == null && distB == null) {
+        return (a.posicaoFinal ?? 999) - (b.posicaoFinal ?? 999);
+      }
       if (distA == null) return 1;
       if (distB == null) return -1;
-      if (distA !== distB) return distA - distB;
-      return b.pontosFinal - a.pontosFinal;
+      if (distA !== distB) return distB - distA;
+      return (a.posicaoFinal ?? 999) - (b.posicaoFinal ?? 999);
     });
     return lista;
   }
