@@ -66,6 +66,7 @@ let state = {
 const analiseState = {
   tipo: null,
   simulacao: null,
+  simulacaoPalpitesOrdenacao: 'pontos',
 };
 
 const adminUi = {
@@ -560,11 +561,28 @@ function renderAnalise() {
     return;
   }
 
+  if (analiseState.tipo === 'possibilidades_exaustivas') {
+    filtros.innerHTML = `
+      <div class="filters">
+        <div class="form-group" style="min-width:240px;">
+          <label for="analise-sim-ordenacao">Ordenar por</label>
+          <select id="analise-sim-ordenacao">
+            <option value="pontos"${analiseState.simulacaoPalpitesOrdenacao === 'pontos' ? ' selected' : ''}>Pontos alcançados</option>
+            <option value="distancia"${analiseState.simulacaoPalpitesOrdenacao === 'distancia' ? ' selected' : ''}>Distância de pontos (abaixo)</option>
+          </select>
+        </div>
+      </div>`;
+    $('#analise-sim-ordenacao')?.addEventListener('change', (e) => {
+      analiseState.simulacaoPalpitesOrdenacao = e.target.value;
+      renderAnalisePossibilidadesExaustivas(container);
+    });
+    renderAnalisePossibilidadesExaustivas(container);
+    return;
+  }
+
   filtros.innerHTML = '';
   if (analiseState.tipo === 'possibilidades_vencer') {
     renderAnalisePossibilidades(container);
-  } else if (analiseState.tipo === 'possibilidades_exaustivas') {
-    renderAnalisePossibilidadesExaustivas(container);
   } else if (analiseState.tipo === 'placar_favorito') {
     renderAnalisePlacarFavorito(container);
   }
@@ -801,6 +819,34 @@ function renderAnalisePossibilidades(container) {
   }, 30);
 }
 
+function ordenarResultadosSimulacaoPalpites(resultados, criterio) {
+  const lista = [...resultados];
+
+  if (criterio === 'distancia') {
+    lista.sort((a, b) => {
+      const distA = a.distPontosAbaixo;
+      const distB = b.distPontosAbaixo;
+      if (distA == null && distB == null) return 0;
+      if (distA == null) return 1;
+      if (distB == null) return -1;
+      if (distA !== distB) return distA - distB;
+      return b.pontosFinal - a.pontosFinal;
+    });
+    return lista;
+  }
+
+  lista.sort(
+    (a, b) =>
+      b.pontosFinal - a.pontosFinal ||
+      (a.posicaoFinal ?? 999) - (b.posicaoFinal ?? 999) ||
+      String(getNomeParticipante(a.participante)).localeCompare(
+        String(getNomeParticipante(b.participante)),
+        'pt-BR'
+      )
+  );
+  return lista;
+}
+
 function renderAnalisePossibilidadesExaustivas(container) {
   if (!state.participantes.length) {
     container.innerHTML =
@@ -813,6 +859,8 @@ function renderAnalisePossibilidadesExaustivas(container) {
     state.jogos,
     state.palpites
   );
+  const criterio = analiseState.simulacaoPalpitesOrdenacao || 'pontos';
+  const resultados = ordenarResultadosSimulacaoPalpites(dados.resultados, criterio);
 
   const metodo = dados.encerrado
     ? 'Bolão encerrado — posição e pontuação já são as finais.'
@@ -838,11 +886,12 @@ function renderAnalisePossibilidadesExaustivas(container) {
               <th>Pontos finais</th>
               <th>Δ pos.</th>
               <th>Imediatamente acima</th>
-              <th>Imediatamente abaixo</th>
+              <th>Participante abaixo</th>
+              <th>Dist. pontos</th>
             </tr>
           </thead>
           <tbody>
-            ${dados.resultados.map((r) => `
+            ${resultados.map((r) => `
               <tr>
                 <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
                 <td>${r.posicaoAtual != null ? posBadge(r.posicaoAtual) : '—'}</td>
@@ -851,7 +900,8 @@ function renderAnalisePossibilidadesExaustivas(container) {
                 <td><strong>${r.pontosFinal}</strong></td>
                 <td>${renderDeltaPosicao(r.deltaPosicao)}</td>
                 <td>${renderVizinhoSimulacao(r.vizinhoAcima, r.distPontosAcima, 'acima')}</td>
-                <td>${renderVizinhoSimulacao(r.vizinhoAbaixo, r.distPontosAbaixo, 'abaixo')}</td>
+                <td>${renderVizinhoAbaixoNome(r.vizinhoAbaixo)}</td>
+                <td>${renderDistanciaPontosAbaixo(r.distPontosAbaixo)}</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -872,6 +922,20 @@ function renderVizinhoSimulacao(vizinho, distancia, tipo) {
       : '<span style="color:var(--text-muted);">No fim</span>';
   }
   return `${escapeHtml(getNomeParticipante(vizinho.participante))} · ${vizinho.pontosTotal} pts · <strong>${distancia} pts</strong> de distância`;
+}
+
+function renderVizinhoAbaixoNome(vizinho) {
+  if (!vizinho) {
+    return '<span style="color:var(--text-muted);">No fim</span>';
+  }
+  return escapeHtml(getNomeParticipante(vizinho.participante));
+}
+
+function renderDistanciaPontosAbaixo(distancia) {
+  if (distancia == null) {
+    return '<span style="color:var(--text-muted);">—</span>';
+  }
+  return `<strong>${distancia}</strong> pts`;
 }
 
 function renderProbBar(pct, gold = false) {
