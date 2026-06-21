@@ -1,0 +1,19 @@
+{
+  "name": "bolao-amigos-2026",
+  "version": "1.0.0",
+  "description": "Sistema web de bolão da Copa do Mundo 2026 (HTML/CSS/JS vanilla + Supabase)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 8080",
+    "serve": "python3 -m http.server 8080",
+    "test": "node scripts/test-scoring.mjs",
+    "test:scoring": "node scripts/test-scoring.mjs",
+    "test:supabase": "node scripts/test-supabase.mjs",
+    "test:ranking": "node scripts/test-ranking.mjs"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "xlsx": "^0.18.5"
+  }
+}
