@@ -804,7 +804,7 @@ function renderAnalisePossibilidades(container) {
                 <th>Pos. atual</th>
                 <th>Pontos</th>
                 <th>P(vencer)</th>
-                <th>P(pódio)</th>
+                <th>P(2º lugar)</th>
                 <th>P(top 10)</th>
               </tr>
             </thead>

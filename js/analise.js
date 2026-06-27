@@ -249,8 +249,10 @@ export function calcularPossibilidadesVencer(
     const share = 1 / vencedores.length;
     for (const v of vencedores) {
       vitorias.set(v.participante.id, share);
-      podio.set(v.participante.id, 1);
-      if (v.posicao <= 10) top10.set(v.participante.id, 1);
+    }
+    for (const r of rankingAtual) {
+      if (r.posicao === 2) podio.set(r.participante.id, 1);
+      if (r.posicao <= 10) top10.set(r.participante.id, 1);
     }
 
     return buildResultadoPossibilidades(
@@ -304,7 +306,7 @@ export function calcularPossibilidadesVencer(
       vitorias.set(v.participante.id, (vitorias.get(v.participante.id) || 0) + share);
     }
 
-    rankingComPos.filter((r) => r.posicao <= 3).forEach((r) => {
+    rankingComPos.filter((r) => r.posicao === 2).forEach((r) => {
       podio.set(r.participante.id, (podio.get(r.participante.id) || 0) + 1);
     });
     rankingComPos.filter((r) => r.posicao <= 10).forEach((r) => {
