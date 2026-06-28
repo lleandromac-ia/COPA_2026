@@ -1368,7 +1368,11 @@ function renderMataPalpites(container, jogosMata) {
 
   const jogosEtapa = jogosMata
     .filter((j) => j.etapa === mataState.etapa && j.liberado)
-    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    .sort(
+      (a, b) =>
+        new Date(a.data_jogo || 0) - new Date(b.data_jogo || 0) ||
+        (a.ordem || 0) - (b.ordem || 0)
+    );
 
   // Confrontos efetivamente preenchíveis (com os dois times definidos).
   const jogosPreenchiveis = jogosEtapa.filter(
