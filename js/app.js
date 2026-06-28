@@ -107,7 +107,13 @@ async function init() {
   try {
     await refreshData();
     $('#loading').style.display = 'none';
-    navigateTo('dashboard');
+    if ((state.jogosMata || []).length) {
+      mataState.secao = 'chaveamento';
+      navigateTo('matamata');
+      openMataFullscreen();
+    } else {
+      navigateTo('dashboard');
+    }
   } catch (err) {
     $('#loading').innerHTML = `
       <div class="empty-state">
@@ -1278,7 +1284,7 @@ function renderBracketColuna(titulo, jogos) {
     </div>`;
 }
 
-function renderMataChaveamento(container, jogosMata) {
+function montarBracketHTML(jogosMata) {
   const porEtapa = agruparPorEtapa(jogosMata);
   const g = (k) => porEtapa.get(k) || [];
 
@@ -1304,16 +1310,43 @@ function renderMataChaveamento(container, jogosMata) {
     renderBracketColuna('16-avos', metadeEtapa(g('16avos'), 'dir')),
   ];
 
+  return `
+    <div class="mm-bracket-wrap">
+      <div class="mm-bracket">${colunas.join('')}</div>
+    </div>`;
+}
+
+function renderMataChaveamento(container, jogosMata) {
   container.innerHTML = `
     <div class="panel">
-      <h2 class="panel__title">Chaveamento — Mundial 2026</h2>
-      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+      <div class="mm-chave-head">
+        <h2 class="panel__title" style="margin:0;">Chaveamento — Mundial 2026</h2>
+        <button type="button" class="btn btn--secondary btn--sm" id="btn-mata-fs-abrir">⛶ Tela cheia</button>
+      </div>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0.75rem 0 1rem;">
         Pontuação válida apenas no tempo normal (sem pênaltis). As fases seguintes são liberadas pelo administrador conforme os times se classificam.
       </p>
-      <div class="mm-bracket-wrap">
-        <div class="mm-bracket">${colunas.join('')}</div>
-      </div>
+      ${montarBracketHTML(jogosMata)}
     </div>`;
+
+  $('#btn-mata-fs-abrir')?.addEventListener('click', openMataFullscreen);
+}
+
+function openMataFullscreen() {
+  const overlay = $('#mata-fullscreen');
+  const body = $('#mata-fs-body');
+  if (!overlay || !body) return;
+  if (!(state.jogosMata || []).length) return;
+  body.innerHTML = montarBracketHTML(state.jogosMata);
+  overlay.hidden = false;
+  document.body.classList.add('mata-fs-open');
+}
+
+function closeMataFullscreen() {
+  const overlay = $('#mata-fullscreen');
+  if (!overlay) return;
+  overlay.hidden = true;
+  document.body.classList.remove('mata-fs-open');
 }
 
 function renderMataPalpites(container, jogosMata) {
@@ -1333,9 +1366,41 @@ function renderMataPalpites(container, jogosMata) {
     mataState.etapa = etapasLiberadas[etapasLiberadas.length - 1].key;
   }
 
+  const jogosEtapa = jogosMata
+    .filter((j) => j.etapa === mataState.etapa && j.liberado)
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+
+  // Confrontos efetivamente preenchíveis (com os dois times definidos).
+  const jogosPreenchiveis = jogosEtapa.filter(
+    (j) => timeDefinido(j.time_a) && timeDefinido(j.time_b)
+  );
+
+  // Um participante "conclui" a fase ao ter palpite em todos os confrontos
+  // preenchíveis dela. A partir daí sai da lista e não pode mais editar.
+  // Ao liberar uma nova fase, ninguém tem palpites nela ainda → todos voltam.
+  const concluiuEtapa = (participanteId) => {
+    if (!jogosPreenchiveis.length) return false;
+    const meus = new Set(
+      state.palpites
+        .filter((p) => p.participante_id === participanteId)
+        .map((p) => p.jogo_id)
+    );
+    return jogosPreenchiveis.every((j) => meus.has(j.id));
+  };
+
+  const participantesDisponiveis = state.participantes.filter(
+    (p) => !concluiuEtapa(p.id)
+  );
+  const totalConcluidos = state.participantes.length - participantesDisponiveis.length;
+
+  // Se o participante selecionado já concluiu esta fase, limpa a seleção.
+  if (mataState.participanteId && concluiuEtapa(mataState.participanteId)) {
+    mataState.participanteId = '';
+  }
+
   const optParticipantes =
     '<option value="">Selecione um participante</option>' +
-    state.participantes
+    participantesDisponiveis
       .map((p) => `<option value="${p.id}" ${mataState.participanteId === p.id ? 'selected' : ''}>${escapeHtml(getNomeParticipante(p))}</option>`)
       .join('');
 
@@ -1349,12 +1414,10 @@ function renderMataPalpites(container, jogosMata) {
       .map((p) => [p.jogo_id, p])
   );
 
-  const jogosEtapa = jogosMata
-    .filter((j) => j.etapa === mataState.etapa && j.liberado)
-    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-
   let corpo;
-  if (!mataState.participanteId) {
+  if (!participantesDisponiveis.length) {
+    corpo = '<div class="empty-state"><div class="empty-state__icon">✅</div><p>Todos os participantes já preencheram os palpites desta fase.</p></div>';
+  } else if (!mataState.participanteId) {
     corpo = '<div class="empty-state"><div class="empty-state__icon">🎯</div><p>Selecione um participante para registrar os palpites.</p></div>';
   } else if (!jogosEtapa.length) {
     corpo = '<p style="color:var(--text-muted);font-size:0.85rem;">Nenhum confronto liberado nesta etapa.</p>';
@@ -1363,6 +1426,9 @@ function renderMataPalpites(container, jogosMata) {
       .map((jogo) => renderMataPalpiteRow(jogo, palpitesMap.get(jogo.id)))
       .join('');
     corpo = `
+      <p style="font-size:0.82rem;color:var(--warning);margin-bottom:0.75rem;">
+        ⚠️ Preencha todos os confrontos da fase. Ao salvar com todos preenchidos, os palpites ficam <strong>travados</strong> e o seu nome sai da lista desta fase.
+      </p>
       <div class="panel palpites-grupo">
         <div class="table-wrap">
           <table class="palpites-table">
@@ -1380,15 +1446,20 @@ function renderMataPalpites(container, jogosMata) {
       </div>`;
   }
 
+  const infoConcluidos = totalConcluidos
+    ? `<p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem;">${totalConcluidos} de ${state.participantes.length} participante(s) já concluíram a fase <strong>${escapeHtml(etapaLabel(mataState.etapa))}</strong>.</p>`
+    : '';
+
   container.innerHTML = `
+    ${infoConcluidos}
     <div class="filters">
-      <div class="form-group">
-        <label for="mata-participante">Participante</label>
-        <select id="mata-participante">${optParticipantes}</select>
-      </div>
       <div class="form-group">
         <label for="mata-etapa">Etapa</label>
         <select id="mata-etapa">${optEtapas}</select>
+      </div>
+      <div class="form-group">
+        <label for="mata-participante">Participante</label>
+        <select id="mata-participante">${optParticipantes}</select>
       </div>
       <button class="btn btn--primary" id="btn-salvar-palpites-mata">Salvar Palpites</button>
     </div>
@@ -1460,13 +1531,19 @@ async function salvarPalpitesMata() {
 
   const rows = $$('#mata-palpites-container .palpites-row');
   let salvos = 0;
+  let editaveis = 0;
+  let vazios = 0;
 
   try {
     for (const row of rows) {
       const golsA = row.querySelector('[data-gols="a"]');
       const golsB = row.querySelector('[data-gols="b"]');
       if (!golsA || golsA.disabled) continue;
-      if (golsA.value === '' || golsB.value === '') continue;
+      editaveis++;
+      if (golsA.value === '' || golsB.value === '') {
+        vazios++;
+        continue;
+      }
 
       await salvarPalpite({
         participante_id: participanteId,
@@ -1476,7 +1553,14 @@ async function salvarPalpitesMata() {
       });
       salvos++;
     }
-    showToast(`${salvos} palpite(s) salvos!`, 'success');
+
+    if (editaveis > 0 && vazios === 0) {
+      showToast('Fase concluída! Palpites travados e nome removido desta fase.', 'success');
+    } else if (vazios > 0) {
+      showToast(`${salvos} palpite(s) salvos. Faltam ${vazios} confronto(s) para travar a fase.`, 'info');
+    } else {
+      showToast(`${salvos} palpite(s) salvos!`, 'success');
+    }
     await refreshData();
   } catch (err) {
     showToast(err.message, 'error');
@@ -2328,6 +2412,13 @@ function setupForms() {
   $('#btn-toggle-jogos-anteriores')?.addEventListener('click', () => {
     adminUi.ocultarJogosAnteriores = !adminUi.ocultarJogosAnteriores;
     renderAdminJogos();
+  });
+
+  $('#btn-mata-fs-close')?.addEventListener('click', closeMataFullscreen);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#mata-fullscreen')?.hidden) {
+      closeMataFullscreen();
+    }
   });
 
   setupImportacao();
