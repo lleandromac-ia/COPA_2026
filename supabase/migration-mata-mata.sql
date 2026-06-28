@@ -44,7 +44,7 @@ INSERT INTO jogos (codigo, grupo, rodada, fase, etapa, liberado, time_a, time_b,
   ('MM16-08', NULL, NULL, 'mata_mata', '16avos', TRUE, 'Bélgica',       'Senegal',               '2026-07-01 21:00:00-03', 108),
   -- 16-avos de final (lado direito da chave)
   ('MM16-09', NULL, NULL, 'mata_mata', '16avos', TRUE, 'Brasil',        'Japão',                 '2026-06-29 18:00:00-03', 109),
-  ('MM16-10', NULL, NULL, 'mata_mata', '16avos', TRUE, 'Camarões',      'Noruega',               '2026-06-30 18:00:00-03', 110),
+  ('MM16-10', NULL, NULL, 'mata_mata', '16avos', TRUE, 'Costa do Marfim', 'Noruega',             '2026-06-30 18:00:00-03', 110),
   ('MM16-11', NULL, NULL, 'mata_mata', '16avos', TRUE, 'México',        'Equador',               '2026-07-01 02:00:00-03', 111),
   ('MM16-12', NULL, NULL, 'mata_mata', '16avos', TRUE, 'Inglaterra',    'Congo',                 '2026-07-01 17:00:00-03', 112),
   ('MM16-13', NULL, NULL, 'mata_mata', '16avos', TRUE, 'Argentina',     'Cabo Verde',            '2026-07-03 23:00:00-03', 113),
@@ -80,3 +80,8 @@ INSERT INTO jogos (codigo, grupo, rodada, fase, etapa, liberado, time_a, time_b,
   -- Final
   ('MMFN-01', NULL, NULL, 'mata_mata', 'final', FALSE, 'A definir', 'A definir', '2026-07-19 20:00:00-03', 161)
 ON CONFLICT (codigo) DO NOTHING;
+
+-- 4) Correções de dados já existentes -------------------------
+-- Confronto MM16-10 era "Camarões", o correto é "Costa do Marfim".
+UPDATE jogos SET time_a = 'Costa do Marfim'
+WHERE codigo = 'MM16-10' AND time_a = 'Camarões';

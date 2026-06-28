@@ -100,7 +100,7 @@ const SIGLAS = {
   'Senegal': 'SEN',
   'Brasil': 'BRA',
   'Japão': 'JAP',
-  'Camarões': 'CMA',
+  'Costa do Marfim': 'CMA',
   'Noruega': 'NOR',
   'México': 'MEX',
   'Equador': 'EQU',
