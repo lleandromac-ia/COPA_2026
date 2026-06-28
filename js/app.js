@@ -7,6 +7,8 @@ import {
   salvarResultadoJogo,
   excluirResultadoJogo,
   atualizarConfiguracao,
+  atualizarLiberacaoEtapa,
+  atualizarNomesTimes,
 } from './db.js';
 import {
   calcularRanking,
@@ -33,6 +35,16 @@ import {
   isJogoDiaAnterior,
 } from './utils.js';
 import { renderBandeira } from './flags.js';
+import {
+  ETAPAS_MATA,
+  etapaLabel,
+  getJogosMata,
+  getJogosGrupos,
+  agruparPorEtapa,
+  etapaLiberada,
+  timeDefinido,
+  siglaTime,
+} from './mata.js';
 import {
   buildEvolucaoPontos,
   buildEvolucaoPosicao,
@@ -66,6 +78,7 @@ let state = {
   },
   participantes: [],
   jogos: [],
+  jogosMata: [],
   palpites: [],
 };
 
@@ -80,6 +93,12 @@ const adminUi = {
 };
 
 const palpitesPendentes = new Map();
+
+const mataState = {
+  secao: 'chaveamento',
+  participanteId: '',
+  etapa: '',
+};
 
 async function init() {
   setupNavigation();
@@ -105,6 +124,10 @@ async function init() {
 async function refreshData() {
   const dados = await carregarDados();
   state = dados;
+  // Separa as fases: `state.jogos` mantém apenas a fase de grupos (para que
+  // todas as telas existentes continuem históricas), e o mata-mata fica à parte.
+  state.jogosMata = getJogosMata(state.jogos);
+  state.jogos = getJogosGrupos(state.jogos);
   populateSelects();
   updateNavVisibility();
   updateAdminUI();
@@ -131,7 +154,9 @@ function navigateTo(view) {
 
   const activeView = $('.view--active');
   const viewAnterior = activeView?.id?.replace('view-', '');
-  if (viewAnterior === 'admin' && view !== 'admin' && isAdmin()) {
+  // O mata-mata possui controles administrativos próprios, então o modo admin
+  // não é encerrado ao navegar de Admin → Mata-mata.
+  if (viewAnterior === 'admin' && view !== 'admin' && view !== 'matamata' && isAdmin()) {
     encerrarModoAdmin(false);
   }
 
@@ -156,6 +181,7 @@ function renderView(view) {
     case 'dashboard': renderDashboard(); break;
     case 'participantes': renderParticipantes(); break;
     case 'palpites': renderPalpites(); break;
+    case 'matamata': renderMataMata(); break;
     case 'analise':
       ensureAnaliseTipo();
       if (analiseState.tipo === 'palpites_jogo') definirJogoPadraoAnalise();
@@ -1164,6 +1190,466 @@ function renderRanking() {
     </table>`;
 }
 
+/* ============================================================
+ * Mata-mata (fase de confronto direto)
+ * ============================================================ */
+
+const MATA_SECOES_BASE = [
+  { id: 'chaveamento', label: 'Chaveamento' },
+  { id: 'palpites', label: 'Palpites' },
+  { id: 'ranking', label: 'Ranking' },
+];
+
+function renderMataMata() {
+  const jogosMata = state.jogosMata || [];
+  const subnav = $('#mata-subnav');
+  const container = $('#mata-conteudo');
+  if (!subnav || !container) return;
+
+  const secoes = [...MATA_SECOES_BASE];
+  if (isAdmin()) secoes.push({ id: 'admin', label: 'Administração' });
+  if (!secoes.some((s) => s.id === mataState.secao)) mataState.secao = 'chaveamento';
+
+  subnav.innerHTML = secoes
+    .map(
+      (s) =>
+        `<button type="button" class="analise-subnav__btn ${mataState.secao === s.id ? 'analise-subnav__btn--active' : ''}" data-mata-secao="${s.id}">${escapeHtml(s.label)}</button>`
+    )
+    .join('');
+  subnav.querySelectorAll('[data-mata-secao]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      mataState.secao = btn.dataset.mataSecao;
+      renderMataMata();
+    });
+  });
+
+  if (!jogosMata.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state__icon">🗂️</div>
+        <p><strong>Mata-mata ainda não habilitado.</strong></p>
+        <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">
+          Execute <code>supabase/migration-mata-mata.sql</code> no Supabase para criar os confrontos.
+        </p>
+      </div>`;
+    return;
+  }
+
+  switch (mataState.secao) {
+    case 'chaveamento': renderMataChaveamento(container, jogosMata); break;
+    case 'palpites': renderMataPalpites(container, jogosMata); break;
+    case 'ranking': renderMataRanking(container, jogosMata); break;
+    case 'admin': renderMataAdmin(container, jogosMata); break;
+  }
+}
+
+function metadeEtapa(jogos, lado) {
+  const meio = Math.ceil(jogos.length / 2);
+  return lado === 'esq' ? jogos.slice(0, meio) : jogos.slice(meio);
+}
+
+function renderBracketCard(jogo) {
+  const finalizado = jogoFinalizado(jogo);
+  const ga = jogo.gols_a;
+  const gb = jogo.gols_b;
+  const aVenc = finalizado && ga > gb;
+  const bVenc = finalizado && gb > ga;
+  const linha = (nome, gols, venceu) => `
+    <div class="mm-card__team ${venceu ? 'mm-card__team--win' : ''}">
+      <span class="mm-card__flag">${renderBandeira(nome) || '<span class="mm-card__flag-empty"></span>'}</span>
+      <span class="mm-card__sig" title="${escapeHtml(nome)}">${escapeHtml(siglaTime(nome))}</span>
+      <span class="mm-card__score">${gols ?? ''}</span>
+    </div>`;
+  return `
+    <div class="mm-card ${finalizado ? 'mm-card--done' : ''}">
+      <div class="mm-card__date">${escapeHtml(jogo.codigo)} · ${formatarDataJogo(jogo.data_jogo)} ${formatarHoraJogo(jogo.data_jogo)}</div>
+      ${linha(jogo.time_a, ga, aVenc)}
+      ${linha(jogo.time_b, gb, bVenc)}
+    </div>`;
+}
+
+function renderBracketColuna(titulo, jogos) {
+  return `
+    <div class="mm-col">
+      <div class="mm-col__title">${escapeHtml(titulo)}</div>
+      <div class="mm-col__cards">
+        ${jogos.map(renderBracketCard).join('')}
+      </div>
+    </div>`;
+}
+
+function renderMataChaveamento(container, jogosMata) {
+  const porEtapa = agruparPorEtapa(jogosMata);
+  const g = (k) => porEtapa.get(k) || [];
+
+  const colunas = [
+    renderBracketColuna('16-avos', metadeEtapa(g('16avos'), 'esq')),
+    renderBracketColuna('Oitavas', metadeEtapa(g('oitavas'), 'esq')),
+    renderBracketColuna('Quartas', metadeEtapa(g('quartas'), 'esq')),
+    renderBracketColuna('Semifinal', metadeEtapa(g('semi'), 'esq')),
+    `<div class="mm-col mm-col--centro">
+      <div class="mm-final">
+        <div class="mm-final__trophy">🏆</div>
+        <div class="mm-final__label">FINAL</div>
+        ${g('final').map(renderBracketCard).join('') || '<div class="mm-card mm-card--empty">A definir</div>'}
+      </div>
+      <div class="mm-terceiro">
+        <div class="mm-col__title">3º lugar</div>
+        ${g('terceiro').map(renderBracketCard).join('') || '<div class="mm-card mm-card--empty">A definir</div>'}
+      </div>
+    </div>`,
+    renderBracketColuna('Semifinal', metadeEtapa(g('semi'), 'dir')),
+    renderBracketColuna('Quartas', metadeEtapa(g('quartas'), 'dir')),
+    renderBracketColuna('Oitavas', metadeEtapa(g('oitavas'), 'dir')),
+    renderBracketColuna('16-avos', metadeEtapa(g('16avos'), 'dir')),
+  ];
+
+  container.innerHTML = `
+    <div class="panel">
+      <h2 class="panel__title">Chaveamento — Mundial 2026</h2>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+        Pontuação válida apenas no tempo normal (sem pênaltis). As fases seguintes são liberadas pelo administrador conforme os times se classificam.
+      </p>
+      <div class="mm-bracket-wrap">
+        <div class="mm-bracket">${colunas.join('')}</div>
+      </div>
+    </div>`;
+}
+
+function renderMataPalpites(container, jogosMata) {
+  const etapasLiberadas = ETAPAS_MATA.filter((e) => etapaLiberada(jogosMata, e.key));
+
+  if (!etapasLiberadas.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state__icon">🔒</div>
+        <p>Nenhuma etapa liberada para palpites no momento.</p>
+        <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">O administrador libera cada etapa quando os confrontos estiverem definidos.</p>
+      </div>`;
+    return;
+  }
+
+  if (!etapasLiberadas.some((e) => e.key === mataState.etapa)) {
+    mataState.etapa = etapasLiberadas[etapasLiberadas.length - 1].key;
+  }
+
+  const optParticipantes =
+    '<option value="">Selecione um participante</option>' +
+    state.participantes
+      .map((p) => `<option value="${p.id}" ${mataState.participanteId === p.id ? 'selected' : ''}>${escapeHtml(getNomeParticipante(p))}</option>`)
+      .join('');
+
+  const optEtapas = etapasLiberadas
+    .map((e) => `<option value="${e.key}" ${mataState.etapa === e.key ? 'selected' : ''}>${escapeHtml(e.label)}</option>`)
+    .join('');
+
+  const palpitesMap = new Map(
+    state.palpites
+      .filter((p) => p.participante_id === mataState.participanteId)
+      .map((p) => [p.jogo_id, p])
+  );
+
+  const jogosEtapa = jogosMata
+    .filter((j) => j.etapa === mataState.etapa && j.liberado)
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+
+  let corpo;
+  if (!mataState.participanteId) {
+    corpo = '<div class="empty-state"><div class="empty-state__icon">🎯</div><p>Selecione um participante para registrar os palpites.</p></div>';
+  } else if (!jogosEtapa.length) {
+    corpo = '<p style="color:var(--text-muted);font-size:0.85rem;">Nenhum confronto liberado nesta etapa.</p>';
+  } else {
+    const linhas = jogosEtapa
+      .map((jogo) => renderMataPalpiteRow(jogo, palpitesMap.get(jogo.id)))
+      .join('');
+    corpo = `
+      <div class="panel palpites-grupo">
+        <div class="table-wrap">
+          <table class="palpites-table">
+            <thead>
+              <tr>
+                <th class="palpites-th-num">Nº</th>
+                <th class="palpites-th-data">Data</th>
+                <th class="palpites-th-hora">Hora</th>
+                <th class="palpites-th-jogo">Confronto</th>
+              </tr>
+            </thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <div class="filters">
+      <div class="form-group">
+        <label for="mata-participante">Participante</label>
+        <select id="mata-participante">${optParticipantes}</select>
+      </div>
+      <div class="form-group">
+        <label for="mata-etapa">Etapa</label>
+        <select id="mata-etapa">${optEtapas}</select>
+      </div>
+      <button class="btn btn--primary" id="btn-salvar-palpites-mata">Salvar Palpites</button>
+    </div>
+    <div id="mata-palpites-container">${corpo}</div>`;
+
+  $('#mata-participante').addEventListener('change', (e) => {
+    mataState.participanteId = e.target.value;
+    renderMataMata();
+  });
+  $('#mata-etapa').addEventListener('change', (e) => {
+    mataState.etapa = e.target.value;
+    renderMataMata();
+  });
+  $('#btn-salvar-palpites-mata').addEventListener('click', salvarPalpitesMata);
+}
+
+function renderMataPalpiteRow(jogo, palpite) {
+  const golsA = palpite?.gols_a ?? '';
+  const golsB = palpite?.gols_b ?? '';
+  const finalizado = jogoFinalizado(jogo);
+  const timesProntos = timeDefinido(jogo.time_a) && timeDefinido(jogo.time_b);
+  const somenteLeitura = finalizado || !timesProntos;
+  const pontos =
+    finalizado && palpite
+      ? calcularPontos(golsA, golsB, jogo.gols_a, jogo.gols_b)
+      : null;
+
+  const metaResultado = finalizado
+    ? `<div class="palpites-meta">
+        <span class="resultado-badge resultado-badge--ok">Oficial: ${formatarPlacar(jogo.gols_a, jogo.gols_b)}</span>
+        ${pontos !== null ? `<span class="pontos-badge ${pontosBadgeClass(pontos)}">${pontos} pts</span>` : ''}
+      </div>`
+    : !timesProntos
+      ? '<div class="palpites-meta"><span class="resultado-badge resultado-badge--pending">Aguardando definição dos times</span></div>'
+      : '';
+
+  return `
+    <tr class="palpites-row" data-jogo-id="${jogo.id}">
+      <td class="palpites-num">${numeroJogo(jogo.codigo)}</td>
+      <td class="palpites-data">${formatarDataJogo(jogo.data_jogo)}</td>
+      <td class="palpites-hora">${formatarHoraJogo(jogo.data_jogo)}</td>
+      <td class="palpites-jogo-cell">
+        <div class="palpites-match">
+          <div class="palpites-team palpites-team--home">
+            <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
+            ${renderBandeira(jogo.time_a)}
+          </div>
+          <div class="palpites-placar placar-inputs">
+            <input type="number" min="0" max="20" value="${golsA}" data-gols="a" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_a)}">
+            <span class="palpites-x">x</span>
+            <input type="number" min="0" max="20" value="${golsB}" data-gols="b" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_b)}">
+          </div>
+          <div class="palpites-team palpites-team--away">
+            ${renderBandeira(jogo.time_b)}
+            <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
+          </div>
+        </div>
+        ${metaResultado}
+      </td>
+    </tr>`;
+}
+
+async function salvarPalpitesMata() {
+  const participanteId = mataState.participanteId;
+  if (!participanteId) {
+    showToast('Selecione um participante.', 'error');
+    return;
+  }
+
+  const rows = $$('#mata-palpites-container .palpites-row');
+  let salvos = 0;
+
+  try {
+    for (const row of rows) {
+      const golsA = row.querySelector('[data-gols="a"]');
+      const golsB = row.querySelector('[data-gols="b"]');
+      if (!golsA || golsA.disabled) continue;
+      if (golsA.value === '' || golsB.value === '') continue;
+
+      await salvarPalpite({
+        participante_id: participanteId,
+        jogo_id: row.dataset.jogoId,
+        gols_a: parseInt(golsA.value, 10),
+        gols_b: parseInt(golsB.value, 10),
+      });
+      salvos++;
+    }
+    showToast(`${salvos} palpite(s) salvos!`, 'success');
+    await refreshData();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function renderMataRanking(container, jogosMata) {
+  const ranking = calcularRanking(state.participantes, jogosMata, state.palpites);
+  const jogosFinalizados = jogosMata.filter(jogoFinalizado).length;
+
+  if (!ranking.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🏆</div><p>Cadastre participantes para ver o ranking.</p></div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="panel">
+      <h2 class="panel__title">Ranking do Mata-mata</h2>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+        Pontuação exclusiva do mata-mata (começa do zero nos 16-avos). ${jogosFinalizados} confronto(s) finalizado(s).
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pos.</th><th>Participante</th><th>Pontos</th>
+              <th>Placares Exatos</th><th>Acertos Vencedor</th><th>Erros</th><th>Aproveitamento</th>
+            </tr>
+          </thead>
+          <tbody>${ranking
+            .map(
+              (r) => `
+            <tr>
+              <td>${posBadge(r.posicao)}</td>
+              <td>${escapeHtml(getNomeParticipante(r.participante))}</td>
+              <td><strong>${r.pontosTotal}</strong></td>
+              <td>${r.placaresExatos}</td>
+              <td>${r.acertosVencedor}</td>
+              <td>${r.erros}</td>
+              <td>${r.aproveitamento}%</td>
+            </tr>`
+            )
+            .join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderMataAdmin(container, jogosMata) {
+  const porEtapa = agruparPorEtapa(jogosMata);
+
+  const blocos = ETAPAS_MATA.map((etapa) => {
+    const jogos = porEtapa.get(etapa.key) || [];
+    if (!jogos.length) return '';
+    const liberada = jogos.some((j) => j.liberado);
+
+    const cards = jogos
+      .map((jogo) => {
+        const temResultado = jogo.gols_a !== null && jogo.gols_b !== null;
+        return `
+        <article class="admin-jogo-card" data-mm-jogo="${jogo.id}">
+          <div class="admin-jogo-card__header">
+            <strong>${escapeHtml(jogo.codigo)}</strong>
+            <span>${formatarDataJogo(jogo.data_jogo)} ${formatarHoraJogo(jogo.data_jogo)}</span>
+            ${temResultado ? '<span class="resultado-badge resultado-badge--ok">Com resultado</span>' : '<span class="resultado-badge resultado-badge--pending">Sem resultado</span>'}
+          </div>
+          <div class="admin-jogo-card__fields">
+            <div class="form-group">
+              <label class="admin-team-label">${renderBandeira(jogo.time_a)} Time A</label>
+              <input type="text" value="${escapeHtml(jogo.time_a)}" data-field="time_a">
+            </div>
+            <div class="admin-jogo-card__placar">
+              <div class="form-group">
+                <label>Gols A</label>
+                <input type="number" min="0" max="20" value="${jogo.gols_a ?? ''}" data-field="gols_a" placeholder="—">
+              </div>
+              <span class="admin-jogo-card__x">x</span>
+              <div class="form-group">
+                <label>Gols B</label>
+                <input type="number" min="0" max="20" value="${jogo.gols_b ?? ''}" data-field="gols_b" placeholder="—">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="admin-team-label">${renderBandeira(jogo.time_b)} Time B</label>
+              <input type="text" value="${escapeHtml(jogo.time_b)}" data-field="time_b">
+            </div>
+          </div>
+          <div class="admin-jogo-card__actions">
+            <button type="button" class="btn btn--primary btn--sm" data-mm-save="${jogo.id}">Salvar</button>
+            <button type="button" class="btn btn--danger btn--sm" data-mm-clear="${jogo.id}" ${temResultado ? '' : 'disabled'}>Excluir placar</button>
+          </div>
+        </article>`;
+      })
+      .join('');
+
+    return `
+      <div class="panel">
+        <div class="mm-admin-etapa-head">
+          <h2 class="panel__title" style="margin:0;">${escapeHtml(etapa.label)}</h2>
+          <label class="toggle">
+            <input type="checkbox" data-mm-liberar="${etapa.key}" ${liberada ? 'checked' : ''}>
+            <span class="toggle__slider"></span>
+          </label>
+          <span style="font-size:0.82rem;color:var(--text-muted);">${liberada ? 'Liberada para palpites' : 'Bloqueada'}</span>
+        </div>
+        <div class="admin-jogos-list">${cards}</div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+      Defina os times de cada etapa, lance os resultados (tempo normal) e libere o preenchimento dos palpites etapa por etapa.
+    </p>
+    ${blocos}`;
+
+  container.querySelectorAll('[data-mm-liberar]').forEach((input) => {
+    input.addEventListener('change', async (e) => {
+      const etapa = e.target.dataset.mmLiberar;
+      const liberado = e.target.checked;
+      try {
+        await atualizarLiberacaoEtapa(etapa, liberado);
+        showToast(liberado ? `${etapaLabel(etapa)} liberada para palpites.` : `${etapaLabel(etapa)} bloqueada.`, 'success');
+        await refreshData();
+      } catch (err) {
+        showToast(err.message, 'error');
+        e.target.checked = !liberado;
+      }
+    });
+  });
+
+  container.querySelectorAll('[data-mm-save]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const card = btn.closest('.admin-jogo-card');
+      const jogoId = btn.dataset.mmSave;
+      const timeA = card.querySelector('[data-field="time_a"]').value.trim();
+      const timeB = card.querySelector('[data-field="time_b"]').value.trim();
+      const golsA = card.querySelector('[data-field="gols_a"]').value;
+      const golsB = card.querySelector('[data-field="gols_b"]').value;
+
+      if (!timeA || !timeB) {
+        showToast('Informe os dois times.', 'error');
+        return;
+      }
+
+      try {
+        await atualizarNomesTimes(jogoId, timeA, timeB);
+        if (golsA !== '' && golsB !== '') {
+          await salvarResultadoJogo(jogoId, parseInt(golsA, 10), parseInt(golsB, 10));
+        }
+        showToast('Confronto salvo!', 'success');
+        await refreshData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+
+  container.querySelectorAll('[data-mm-clear]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      if (!confirm('Excluir o placar oficial deste confronto?')) return;
+      try {
+        await excluirResultadoJogo(btn.dataset.mmClear);
+        showToast('Placar excluído.', 'success');
+        await refreshData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+}
+
 function renderTabelaPalpitesParticipante(participanteId, { apenasRealizados = false } = {}) {
   const palpitesMap = new Map(
     state.palpites
@@ -1462,6 +1948,7 @@ function renderAdmin() {
     $('#admin-content').style.display = 'block';
     $('#toggle-bloqueio').checked = state.config.cadastro_bloqueado;
     renderAdminAnalisesToggles();
+    renderAdminMataLiberacao();
     renderAdminJogos();
   } else {
     $('#admin-login-panel').style.display = 'block';
@@ -1517,6 +2004,59 @@ function renderAdminAnalisesToggles() {
       } catch (err) {
         showToast(err.message, 'error');
         e.target.checked = !valor;
+      }
+    });
+  });
+}
+
+function renderAdminMataLiberacao() {
+  const container = $('#admin-mata-liberacao');
+  if (!container) return;
+
+  const jogosMata = state.jogosMata || [];
+  if (!jogosMata.length) {
+    container.innerHTML =
+      '<p style="font-size:0.85rem;color:var(--text-muted);">Mata-mata ainda não habilitado. Execute <code>supabase/migration-mata-mata.sql</code>.</p>';
+    return;
+  }
+
+  const porEtapa = agruparPorEtapa(jogosMata);
+
+  container.innerHTML = ETAPAS_MATA.map((etapa) => {
+    const jogos = porEtapa.get(etapa.key) || [];
+    if (!jogos.length) return '';
+    const liberada = jogos.some((j) => j.liberado);
+    const finalizados = jogos.filter(jogoFinalizado).length;
+
+    return `
+    <div class="toggle-row">
+      <div>
+        <strong>${escapeHtml(etapa.label)}</strong>
+        <p style="font-size:0.82rem;color:var(--text-muted);">
+          ${jogos.length} confronto(s) · ${finalizados} com resultado · ${liberada ? 'liberada para palpites' : 'bloqueada'}
+        </p>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" data-mm-liberar-admin="${etapa.key}" ${liberada ? 'checked' : ''}>
+        <span class="toggle__slider"></span>
+      </label>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('[data-mm-liberar-admin]').forEach((input) => {
+    input.addEventListener('change', async (e) => {
+      const etapa = e.target.dataset.mmLiberarAdmin;
+      const liberado = e.target.checked;
+      try {
+        await atualizarLiberacaoEtapa(etapa, liberado);
+        showToast(
+          liberado ? `${etapaLabel(etapa)} liberada para palpites.` : `${etapaLabel(etapa)} bloqueada.`,
+          'success'
+        );
+        await refreshData();
+      } catch (err) {
+        showToast(err.message, 'error');
+        e.target.checked = !liberado;
       }
     });
   });

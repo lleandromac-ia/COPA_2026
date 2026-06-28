@@ -1420,3 +1420,143 @@ input[type='number'] {
   body { background: #fff; color: #000; }
   .panel { border: 1px solid #ccc; box-shadow: none; }
 }
+
+/* ============================================================
+   Mata-mata — chaveamento (bracket)
+   ============================================================ */
+.mm-bracket-wrap {
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.mm-bracket {
+  display: flex;
+  gap: 0.75rem;
+  min-width: max-content;
+  align-items: stretch;
+  padding: 0.5rem 0;
+}
+
+.mm-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+}
+
+.mm-col__title {
+  text-align: center;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.mm-col__cards {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  gap: 0.55rem;
+}
+
+.mm-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.mm-card--done {
+  border-color: var(--accent);
+}
+
+.mm-card--empty {
+  color: var(--text-muted);
+  text-align: center;
+  font-style: italic;
+}
+
+.mm-card__date {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mm-card__team {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.12rem 0;
+}
+
+.mm-card__team--win {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.mm-card__flag,
+.mm-card__flag-empty {
+  width: 20px;
+  height: 15px;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.mm-card__flag-empty {
+  background: var(--bg-hover);
+  border-radius: 2px;
+}
+
+.mm-card__sig {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.mm-card__score {
+  min-width: 1.3em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-col--centro {
+  justify-content: center;
+  align-items: center;
+  min-width: 170px;
+  gap: 1.5rem;
+}
+
+.mm-final {
+  text-align: center;
+  width: 100%;
+}
+
+.mm-final__trophy {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.mm-final__label {
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  margin: 0.25rem 0 0.6rem;
+}
+
+.mm-terceiro {
+  text-align: center;
+  width: 100%;
+}
+
+.mm-admin-etapa-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}

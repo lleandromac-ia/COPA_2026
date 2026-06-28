@@ -11,6 +11,7 @@ const PAIS_PARA_ISO = {
   'Bélgica': 'be',
   'Bósnia e Herzegovina': 'ba',
   'Cabo Verde': 'cv',
+  'Camarões': 'cm',
   'Canadá': 'ca',
   'Catar': 'qa',
   'Colômbia': 'co',

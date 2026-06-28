@@ -20,6 +20,7 @@
         <button class="nav__link nav__link--active" data-nav="dashboard">Dashboard</button>
         <button class="nav__link" data-nav="participantes" id="nav-participantes">Participantes</button>
         <button class="nav__link" data-nav="palpites">Palpites</button>
+        <button class="nav__link" data-nav="matamata">Mata-mata</button>
         <button class="nav__link" data-nav="analise">Análise</button>
         <button class="nav__link" data-nav="ranking">Ranking</button>
         <button class="nav__link" data-nav="comparacao">Comparação</button>
@@ -91,6 +92,14 @@
         <button class="btn btn--primary" id="btn-salvar-palpites">Salvar Palpites</button>
       </div>
       <div id="palpites-container"></div>
+    </section>
+
+    <!-- Mata-mata -->
+    <section class="view" id="view-matamata">
+      <h1 class="page-title">Mata-mata</h1>
+      <p class="page-desc">Fase de confronto direto. A pontuação recomeça do zero nos 16-avos e não se acumula com a fase de grupos (que fica para consulta histórica).</p>
+      <nav class="analise-subnav" id="mata-subnav" aria-label="Seções do mata-mata"></nav>
+      <div id="mata-conteudo"></div>
     </section>
 
     <!-- Análise de palpites -->
@@ -174,6 +183,13 @@
               <span class="toggle__slider"></span>
             </label>
           </div>
+        </div>
+        <div class="panel" id="panel-mata-liberacao">
+          <h2 class="panel__title">Liberação de palpites — Mata-mata</h2>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Libere cada fase na sequência (16-avos → Final). Com a fase liberada, os participantes conseguem preencher os palpites ao selecionar o próprio nome na aba Mata-mata.
+          </p>
+          <div id="admin-mata-liberacao"></div>
         </div>
         <div class="panel" id="panel-analises-admin">
           <h2 class="panel__title">Análises — acesso público</h2>

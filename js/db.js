@@ -160,6 +160,18 @@ export async function atualizarConfiguracao(updates) {
   return data;
 }
 
+export async function atualizarLiberacaoEtapa(etapa, liberado) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('jogos')
+    .update({ liberado })
+    .eq('fase', 'mata_mata')
+    .eq('etapa', etapa)
+    .select();
+  if (error) throw error;
+  return data;
+}
+
 export async function atualizarNomesTimes(jogoId, time_a, time_b) {
   const supabase = getSupabase();
   const { data, error } = await supabase
