@@ -44,6 +44,8 @@ import {
   etapaLiberada,
   timeDefinido,
   siglaTime,
+  participantesComPalpiteMata,
+  palpitesMataParticipante,
 } from './mata.js';
 import {
   buildEvolucaoPontos,
@@ -201,11 +203,28 @@ function renderView(view) {
 }
 
 function populateSelects() {
+  const comPalpiteMata = participantesComPalpiteMata(state.jogosMata, state.palpites);
+
+  const optionsPalpites = state.participantes
+    .map((p) => {
+      const marcaMata = comPalpiteMata.has(p.id) ? ' ✓ mata-mata' : '';
+      return `<option value="${p.id}">${escapeHtml(getNomeParticipante(p))}${marcaMata}</option>`;
+    })
+    .join('');
+
   const options = state.participantes
     .map((p) => `<option value="${p.id}">${escapeHtml(getNomeParticipante(p))}</option>`)
     .join('');
 
-  ['palpite-participante', 'comp-p1', 'comp-p2', 'perfil-select'].forEach((id) => {
+  const selPalpites = $('#palpite-participante');
+  if (selPalpites) {
+    const atual = selPalpites.value;
+    selPalpites.innerHTML =
+      '<option value="">Selecione um participante</option>' + optionsPalpites;
+    if (atual && state.participantes.some((p) => p.id === atual)) selPalpites.value = atual;
+  }
+
+  ['comp-p1', 'comp-p2', 'perfil-select'].forEach((id) => {
     const sel = $(`#${id}`);
     if (!sel) return;
     const placeholder =
@@ -435,24 +454,32 @@ function renderPalpites() {
   const participanteId = $('#palpite-participante').value;
   const grupoFiltro = $('#filtro-grupo-palpites').value;
   const container = $('#palpites-container');
+  const containerMata = $('#palpites-mata-container');
   const somenteConsulta = palpitesSomenteConsulta();
+  const temMata = (state.jogosMata || []).length > 0;
 
   $('#btn-salvar-palpites').style.display = somenteConsulta ? 'none' : '';
   $('#palpites-page-desc').textContent = somenteConsulta
-    ? 'Consulta dos palpites registrados. O cadastro está bloqueado pelo administrador.'
+    ? temMata
+      ? 'Consulta dos palpites da fase de grupos e do mata-mata. Participantes com palpites eliminatórios aparecem marcados na lista.'
+      : 'Consulta dos palpites registrados. O cadastro está bloqueado pelo administrador.'
     : 'Registre os palpites para os 72 jogos da fase de grupos.';
 
   const avisoConsulta = $('#aviso-palpites-consulta');
   if (somenteConsulta) {
     avisoConsulta.style.display = 'block';
     avisoConsulta.textContent =
-      'ℹ️ Modo consulta: os palpites não podem ser alterados enquanto novos cadastros estiverem bloqueados.';
+      'ℹ️ Modo consulta: os palpites não podem ser alterados enquanto novos cadastros estiverem bloqueados. Palpites do mata-mata são preenchidos na aba Mata-mata.';
   } else {
     avisoConsulta.style.display = 'none';
   }
 
   if (!participanteId) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">🎯</div><p>Selecione um participante para ${somenteConsulta ? 'consultar os' : 'registrar'} palpites.</p></div>`;
+    if (containerMata) {
+      containerMata.innerHTML = '';
+      containerMata.style.display = 'none';
+    }
     return;
   }
 
@@ -471,6 +498,71 @@ function renderPalpites() {
   container.innerHTML = gruposPresentes
     .map((grupo) => renderGrupoPalpitesTable(grupo, jogosFiltrados, palpitesMap, somenteConsulta))
     .join('');
+
+  renderPalpitesMataConsulta(participanteId);
+}
+
+function renderPalpitesMataConsulta(participanteId) {
+  const container = $('#palpites-mata-container');
+  if (!container) return;
+
+  const jogosMata = state.jogosMata || [];
+  if (!jogosMata.length || !participanteId) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  const palpitesMap = palpitesMataParticipante(jogosMata, state.palpites, participanteId);
+  if (!palpitesMap.size) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  const porEtapa = agruparPorEtapa(jogosMata);
+  const blocos = ETAPAS_MATA.map((etapa) => {
+    const jogos = (porEtapa.get(etapa.key) || [])
+      .filter((j) => palpitesMap.has(j.id))
+      .sort(
+        (a, b) =>
+          new Date(a.data_jogo || 0) - new Date(b.data_jogo || 0) ||
+          (a.ordem || 0) - (b.ordem || 0)
+      );
+    if (!jogos.length) return '';
+
+    const linhas = jogos
+      .map((jogo) => renderMataPalpiteRow(jogo, palpitesMap.get(jogo.id), true))
+      .join('');
+
+    return `
+      <div class="panel palpites-grupo">
+        <h3 class="panel__title">${escapeHtml(etapa.label)}</h3>
+        <div class="table-wrap">
+          <table class="palpites-table">
+            <thead>
+              <tr>
+                <th class="palpites-th-num">Nº</th>
+                <th class="palpites-th-data">Data</th>
+                <th class="palpites-th-hora">Hora</th>
+                <th class="palpites-th-jogo">Confronto</th>
+              </tr>
+            </thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>
+      </div>`;
+  })
+    .filter(Boolean)
+    .join('');
+
+  container.style.display = '';
+  container.innerHTML = `
+    <div class="palpites-mata-section">
+      <h2 class="page-title page-title--section">Mata-mata</h2>
+      <p class="page-desc">Palpites registrados na fase eliminatória (somente consulta).</p>
+      ${blocos}
+    </div>`;
 }
 
 function renderGrupoPalpitesTable(grupo, jogosFiltrados, palpitesMap, somenteConsulta) {
@@ -1480,12 +1572,12 @@ function renderMataPalpites(container, jogosMata) {
   $('#btn-salvar-palpites-mata').addEventListener('click', salvarPalpitesMata);
 }
 
-function renderMataPalpiteRow(jogo, palpite) {
+function renderMataPalpiteRow(jogo, palpite, somenteConsulta = false) {
   const golsA = palpite?.gols_a ?? '';
   const golsB = palpite?.gols_b ?? '';
   const finalizado = jogoFinalizado(jogo);
   const timesProntos = timeDefinido(jogo.time_a) && timeDefinido(jogo.time_b);
-  const somenteLeitura = finalizado || !timesProntos;
+  const somenteLeitura = somenteConsulta || finalizado || !timesProntos;
   const pontos =
     finalizado && palpite
       ? calcularPontos(golsA, golsB, jogo.gols_a, jogo.gols_b)

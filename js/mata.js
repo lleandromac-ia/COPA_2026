@@ -121,3 +121,23 @@ export function siglaTime(nome) {
   if (SIGLAS[nome]) return SIGLAS[nome];
   return String(nome).trim().slice(0, 3).toUpperCase();
 }
+
+/** IDs de participantes com ao menos um palpite em jogo de mata-mata. */
+export function participantesComPalpiteMata(jogosMata, palpites) {
+  const idsMata = new Set((jogosMata || []).map((j) => j.id));
+  const ids = new Set();
+  for (const p of palpites || []) {
+    if (idsMata.has(p.jogo_id)) ids.add(p.participante_id);
+  }
+  return ids;
+}
+
+/** Palpites de mata-mata de um participante, indexados por jogo_id. */
+export function palpitesMataParticipante(jogosMata, palpites, participanteId) {
+  const idsMata = new Set((jogosMata || []).map((j) => j.id));
+  return new Map(
+    (palpites || [])
+      .filter((p) => p.participante_id === participanteId && idsMata.has(p.jogo_id))
+      .map((p) => [p.jogo_id, p])
+  );
+}

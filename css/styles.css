@@ -203,6 +203,17 @@ body::before {
   box-shadow: var(--shadow);
 }
 
+.page-title--section {
+  font-size: 1.35rem;
+  margin-top: 2rem;
+  margin-bottom: 0.35rem;
+}
+
+.palpites-mata-section .panel__title {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
 .panel__title {
   font-size: 1rem;
   font-weight: 600;
