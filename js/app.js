@@ -549,7 +549,7 @@ function renderPalpitesMataConsulta(participanteId) {
     return `
       <div class="panel palpites-grupo">
         <h3 class="panel__title">${escapeHtml(etapa.label)}</h3>
-        <div class="table-wrap">
+        <div class="table-wrap palpites-table-wrap">
           <table class="palpites-table">
             <thead>
               <tr>
@@ -589,7 +589,8 @@ function renderGrupoPalpitesTable(grupo, jogosFiltrados, palpitesMap, somenteCon
 
   return `
     <div class="panel palpites-grupo">
-      <div class="table-wrap">
+      <h3 class="panel__title palpites-grupo__title">Grupo ${escapeHtml(grupo)}</h3>
+      <div class="table-wrap palpites-table-wrap">
         <table class="palpites-table">
           <thead>
             <tr>
@@ -603,6 +604,42 @@ function renderGrupoPalpitesTable(grupo, jogosFiltrados, palpitesMap, somenteCon
           <tbody>${linhas}</tbody>
         </table>
       </div>
+    </div>`;
+}
+
+function renderPalpiteConfronto(jogo, golsA, golsB, somenteLeitura) {
+  const disabled = somenteLeitura ? 'disabled' : '';
+  return `
+    <div class="palpites-confronto">
+      <div class="palpites-confronto__teams">
+        <div class="palpites-confronto__team">
+          ${renderBandeira(jogo.time_a)}
+          <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
+          <input type="number" min="0" max="20" value="${golsA}" data-gols="a" ${disabled}
+            class="palpites-gol-input" aria-label="Gols ${escapeHtml(jogo.time_a)}">
+        </div>
+        <div class="palpites-confronto__team">
+          ${renderBandeira(jogo.time_b)}
+          <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
+          <input type="number" min="0" max="20" value="${golsB}" data-gols="b" ${disabled}
+            class="palpites-gol-input" aria-label="Gols ${escapeHtml(jogo.time_b)}">
+        </div>
+      </div>
+      <div class="palpites-confronto__schedule">
+        <span class="palpites-confronto__schedule-date">${formatarDataJogo(jogo.data_jogo)}</span>
+        <span class="palpites-confronto__schedule-hora">${formatarHoraJogo(jogo.data_jogo)}</span>
+      </div>
+    </div>`;
+}
+
+function renderPalpiteMetaMobile(jogo) {
+  return `
+    <div class="palpites-mobile-meta">
+      <span class="palpites-mobile-meta__num">Nº ${numeroJogo(jogo.codigo)}</span>
+      <span class="palpites-mobile-meta__sep" aria-hidden="true">·</span>
+      <span class="palpites-mobile-meta__data">${formatarDataJogo(jogo.data_jogo)}</span>
+      <span class="palpites-mobile-meta__sep" aria-hidden="true">·</span>
+      <span class="palpites-mobile-meta__hora">${formatarHoraJogo(jogo.data_jogo)}</span>
     </div>`;
 }
 
@@ -630,25 +667,12 @@ function renderJogoPalpiteRow(jogo, palpite, somenteConsulta = false, primeiraLi
   return `
     <tr class="palpites-row" data-jogo-id="${jogo.id}">
       ${grupoCell}
-      <td class="palpites-num">${numeroJogo(jogo.codigo)}</td>
-      <td class="palpites-data">${formatarDataJogo(jogo.data_jogo)}</td>
-      <td class="palpites-hora">${formatarHoraJogo(jogo.data_jogo)}</td>
+      <td class="palpites-num palpites-col-desktop">${numeroJogo(jogo.codigo)}</td>
+      <td class="palpites-data palpites-col-desktop">${formatarDataJogo(jogo.data_jogo)}</td>
+      <td class="palpites-hora palpites-col-desktop">${formatarHoraJogo(jogo.data_jogo)}</td>
       <td class="palpites-jogo-cell">
-        <div class="palpites-match">
-          <div class="palpites-team palpites-team--home">
-            <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
-            ${renderBandeira(jogo.time_a)}
-          </div>
-          <div class="palpites-placar placar-inputs">
-            <input type="number" min="0" max="20" value="${golsA}" data-gols="a" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_a)}">
-            <span class="palpites-x">x</span>
-            <input type="number" min="0" max="20" value="${golsB}" data-gols="b" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_b)}">
-          </div>
-          <div class="palpites-team palpites-team--away">
-            ${renderBandeira(jogo.time_b)}
-            <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
-          </div>
-        </div>
+        ${renderPalpiteMetaMobile(jogo)}
+        ${renderPalpiteConfronto(jogo, golsA, golsB, somenteLeitura)}
         ${metaResultado}
       </td>
     </tr>`;
@@ -1558,7 +1582,7 @@ function renderMataPalpites(container, jogosMata) {
         ⚠️ Preencha todos os confrontos da fase. Ao salvar com todos preenchidos, os palpites ficam <strong>travados</strong> e o seu nome sai da lista desta fase.
       </p>
       <div class="panel palpites-grupo">
-        <div class="table-wrap">
+        <div class="table-wrap palpites-table-wrap">
           <table class="palpites-table">
             <thead>
               <tr>
@@ -1626,25 +1650,12 @@ function renderMataPalpiteRow(jogo, palpite, somenteConsulta = false) {
 
   return `
     <tr class="palpites-row" data-jogo-id="${jogo.id}">
-      <td class="palpites-num">${numeroJogo(jogo.codigo)}</td>
-      <td class="palpites-data">${formatarDataJogo(jogo.data_jogo)}</td>
-      <td class="palpites-hora">${formatarHoraJogo(jogo.data_jogo)}</td>
+      <td class="palpites-num palpites-col-desktop">${numeroJogo(jogo.codigo)}</td>
+      <td class="palpites-data palpites-col-desktop">${formatarDataJogo(jogo.data_jogo)}</td>
+      <td class="palpites-hora palpites-col-desktop">${formatarHoraJogo(jogo.data_jogo)}</td>
       <td class="palpites-jogo-cell">
-        <div class="palpites-match">
-          <div class="palpites-team palpites-team--home">
-            <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
-            ${renderBandeira(jogo.time_a)}
-          </div>
-          <div class="palpites-placar placar-inputs">
-            <input type="number" min="0" max="20" value="${golsA}" data-gols="a" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_a)}">
-            <span class="palpites-x">x</span>
-            <input type="number" min="0" max="20" value="${golsB}" data-gols="b" ${somenteLeitura ? 'disabled' : ''} aria-label="Gols ${escapeHtml(jogo.time_b)}">
-          </div>
-          <div class="palpites-team palpites-team--away">
-            ${renderBandeira(jogo.time_b)}
-            <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
-          </div>
-        </div>
+        ${renderPalpiteMetaMobile(jogo)}
+        ${renderPalpiteConfronto(jogo, golsA, golsB, somenteLeitura)}
         ${metaResultado}
       </td>
     </tr>`;
@@ -2316,15 +2327,16 @@ function renderAdminJogos() {
             ${temResultado ? '<span class="resultado-badge resultado-badge--ok">Com resultado</span>' : '<span class="resultado-badge resultado-badge--pending">Sem resultado</span>'}
           </div>
           <div class="admin-jogo-card__match">
-            <div class="palpites-match">
-              <div class="palpites-team palpites-team--home">
-                <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
-                ${renderBandeira(jogo.time_a)}
-              </div>
-              <span class="admin-jogo-card__x">x</span>
-              <div class="palpites-team palpites-team--away">
-                ${renderBandeira(jogo.time_b)}
-                <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
+            <div class="palpites-confronto palpites-confronto--readonly">
+              <div class="palpites-confronto__teams">
+                <div class="palpites-confronto__team">
+                  ${renderBandeira(jogo.time_a)}
+                  <span class="palpites-team-name">${escapeHtml(jogo.time_a)}</span>
+                </div>
+                <div class="palpites-confronto__team">
+                  ${renderBandeira(jogo.time_b)}
+                  <span class="palpites-team-name">${escapeHtml(jogo.time_b)}</span>
+                </div>
               </div>
             </div>
           </div>
