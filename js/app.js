@@ -57,7 +57,11 @@ import {
 import { setupImportacao } from './import-ui.js';
 import {
   TIPOS_ANALISE,
+  SECOES_ANALISE,
   getAnalisesHabilitadas,
+  getAnalisesPorFase,
+  isAnalisePalpitesPorJogo,
+  getTiposAnaliseAdmin,
   getTodosJogosAnalise,
   getJogoPadraoAnalise,
   analisarPalpitesJogo,
@@ -109,13 +113,7 @@ async function init() {
   try {
     await refreshData();
     $('#loading').style.display = 'none';
-    if ((state.jogosMata || []).length) {
-      mataState.secao = 'chaveamento';
-      navigateTo('matamata');
-      openMataFullscreen();
-    } else {
-      navigateTo('dashboard');
-    }
+    navigateTo('dashboard');
   } catch (err) {
     $('#loading').innerHTML = `
       <div class="empty-state">
@@ -192,7 +190,7 @@ function renderView(view) {
     case 'matamata': renderMataMata(); break;
     case 'analise':
       ensureAnaliseTipo();
-      if (analiseState.tipo === 'palpites_jogo') definirJogoPadraoAnalise();
+      if (isAnalisePalpitesPorJogo(analiseState.tipo)) definirJogoPadraoAnalise();
       renderAnalise();
       break;
     case 'ranking': renderRanking(); break;
@@ -273,23 +271,36 @@ function updateAnaliseNavVisibility() {
   }
 }
 
+function getJogosListaAnaliseAtual() {
+  return analiseState.tipo === 'palpites_jogo_mata'
+    ? state.jogosMata || []
+    : state.jogos;
+}
+
+function isAnaliseMataAtual() {
+  return analiseState.tipo === 'palpites_jogo_mata';
+}
+
 function populateAnaliseSelect() {
   const sel = $('#analise-jogo');
   if (!sel) return;
 
   const current = sel.value;
-  const todos = getTodosJogosAnalise(state.jogos);
-  const padrao = getJogoPadraoAnalise(state.jogos);
+  const jogosLista = getJogosListaAnaliseAtual();
+  const todos = getTodosJogosAnalise(jogosLista);
+  const padrao = getJogoPadraoAnalise(jogosLista);
+  const isMata = isAnaliseMataAtual();
 
   if (!todos.length) {
-    sel.innerHTML = '<option value="">Nenhuma partida cadastrada</option>';
+    sel.innerHTML = `<option value="">${isMata ? 'Nenhum confronto cadastrado' : 'Nenhuma partida cadastrada'}</option>`;
     return;
   }
 
   sel.innerHTML = todos
     .map((j) => {
       const status = jogoFinalizado(j) ? ' ✓' : '';
-      const label = `${j.codigo} — ${j.time_a} x ${j.time_b} (${formatarDataJogo(j.data_jogo)} ${formatarHoraJogo(j.data_jogo)})${status}`;
+      const faseLabel = isMata ? `${etapaLabel(j.etapa)} · ` : '';
+      const label = `${j.codigo} — ${j.time_a} x ${j.time_b} · ${faseLabel}${formatarDataJogo(j.data_jogo)} ${formatarHoraJogo(j.data_jogo)}${status}`;
       return `<option value="${j.id}">${escapeHtml(label)}</option>`;
     })
     .join('');
@@ -302,7 +313,7 @@ function populateAnaliseSelect() {
 }
 
 function definirJogoPadraoAnalise() {
-  const padrao = getJogoPadraoAnalise(state.jogos);
+  const padrao = getJogoPadraoAnalise(getJogosListaAnaliseAtual());
   const sel = $('#analise-jogo');
   if (padrao && sel && sel.options.length) {
     sel.value = padrao.id;
@@ -659,12 +670,23 @@ function renderAnalise() {
 
   ensureAnaliseTipo();
 
-  subnav.innerHTML = ativas
-    .map(
-      (t) =>
-        `<button type="button" class="analise-subnav__btn ${analiseState.tipo === t.id ? 'analise-subnav__btn--active' : ''}" data-analise-tipo="${t.id}">${escapeHtml(t.label)}</button>`
-    )
-    .join('');
+  subnav.innerHTML = SECOES_ANALISE.map((secao) => {
+    const tipos = getAnalisesPorFase(state.config, secao.fase);
+    if (!tipos.length) return '';
+
+    const botoes = tipos
+      .map(
+        (t) =>
+          `<button type="button" class="analise-subnav__btn ${analiseState.tipo === t.id ? 'analise-subnav__btn--active' : ''}" data-analise-tipo="${t.id}">${escapeHtml(t.label)}</button>`
+      )
+      .join('');
+
+    return `
+      <div class="analise-subnav-section">
+        <span class="analise-subnav-section__label">${escapeHtml(secao.label)}</span>
+        <div class="analise-subnav-section__btns">${botoes}</div>
+      </div>`;
+  }).join('');
 
   subnav.querySelectorAll('[data-analise-tipo]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -674,7 +696,7 @@ function renderAnalise() {
     });
   });
 
-  if (analiseState.tipo === 'palpites_jogo') {
+  if (isAnalisePalpitesPorJogo(analiseState.tipo)) {
     filtros.innerHTML = `
       <div class="filters">
         <div class="form-group" style="flex:1;min-width:280px;">
@@ -720,16 +742,21 @@ function renderAnalise() {
 
 function renderAnaliseConteudo() {
   const container = $('#analise-conteudo');
-  if (analiseState.tipo !== 'palpites_jogo') return;
+  if (!isAnalisePalpitesPorJogo(analiseState.tipo)) return;
   renderAnalisePalpitesJogo(container);
 }
 
 function renderAnalisePalpitesJogo(container) {
   const jogoId = $('#analise-jogo')?.value;
+  const isMata = isAnaliseMataAtual();
+  const jogosLista = getJogosListaAnaliseAtual();
 
-  if (!state.jogos.length) {
-    container.innerHTML =
-      '<div class="empty-state"><div class="empty-state__icon">📊</div><p>Nenhuma partida cadastrada.</p></div>';
+  if (!jogosLista.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state__icon">📊</div>
+        <p>${isMata ? 'Nenhum confronto do mata-mata cadastrado.' : 'Nenhuma partida cadastrada.'}</p>
+      </div>`;
     return;
   }
 
@@ -743,21 +770,26 @@ function renderAnalisePalpitesJogo(container) {
     analiseState.simulacao = null;
   }
 
-  const jogo = state.jogos.find((j) => j.id === jogoId);
+  const jogo = jogosLista.find((j) => j.id === jogoId);
   if (!jogo) return;
 
-  const ranking = getRanking();
+  const ranking = isMata
+    ? calcularRanking(state.participantes, state.jogosMata, state.palpites)
+    : getRanking();
   const analise = analisarPalpitesJogo(jogo, state.palpites, ranking);
   const statusJogo = jogoFinalizado(jogo)
     ? ` · Resultado: ${formatarPlacar(jogo.gols_a, jogo.gols_b)}`
     : '';
+  const metaFase = isMata
+    ? `${jogo.codigo} · ${etapaLabel(jogo.etapa)} · ${formatarDataJogo(jogo.data_jogo)} · ${formatarHoraJogo(jogo.data_jogo)}${statusJogo} · ${analise.total} palpite(s)`
+    : `${jogo.codigo} · Grupo ${jogo.grupo} · ${formatarDataJogo(jogo.data_jogo)} · ${formatarHoraJogo(jogo.data_jogo)}${statusJogo} · ${analise.total} palpite(s)`;
 
   const sim = analiseState.simulacao;
   const rankingSim =
     sim && sim.jogoId === jogoId
       ? simularRankingComPlacar(
           state.participantes,
-          state.jogos,
+          jogosLista,
           state.palpites,
           jogoId,
           sim.golsA,
@@ -778,7 +810,7 @@ function renderAnalisePalpitesJogo(container) {
           <span>${escapeHtml(jogo.time_b)}</span>
         </span>
       </div>
-      <p class="analise-meta">${jogo.codigo} · Grupo ${jogo.grupo} · ${formatarDataJogo(jogo.data_jogo)} · ${formatarHoraJogo(jogo.data_jogo)}${statusJogo} · ${analise.total} palpite(s)</p>
+      <p class="analise-meta">${metaFase}</p>
     </div>
 
     <div class="panel">
@@ -2140,7 +2172,7 @@ function renderAdminAnalisesToggles() {
   const container = $('#admin-analises-toggles');
   if (!container) return;
 
-  container.innerHTML = TIPOS_ANALISE.map(
+  container.innerHTML = getTiposAnaliseAdmin().map(
     (t) => `
     <div class="toggle-row admin-analise-toggle">
       <div>
@@ -2160,7 +2192,7 @@ function renderAdminAnalisesToggles() {
       const valor = e.target.checked;
 
       if (!valor) {
-        const outrasAtivas = TIPOS_ANALISE.filter(
+        const outrasAtivas = getTiposAnaliseAdmin().filter(
           (t) => t.configKey !== key && state.config[t.configKey] !== false
         );
         if (!outrasAtivas.length) {

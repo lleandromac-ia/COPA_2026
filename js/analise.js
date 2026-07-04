@@ -12,30 +12,50 @@ import {
 
 const DUAS_HORAS_MS = 2 * 60 * 60 * 1000;
 
+export const FASE_ANALISE_GRUPOS = 'grupos';
+export const FASE_ANALISE_MATA = 'mata';
+
+export const SECOES_ANALISE = [
+  { fase: FASE_ANALISE_GRUPOS, label: 'Fase de grupos' },
+  { fase: FASE_ANALISE_MATA, label: 'Mata-mata' },
+];
+
 export const TIPOS_ANALISE = [
   {
     id: 'palpites_jogo',
+    fase: FASE_ANALISE_GRUPOS,
     configKey: 'analise_palpites_jogo',
     label: 'Palpites por jogo',
-    desc: 'Distribuição de palpites, heatmap e simulação de resultado por partida.',
+    desc: 'Distribuição de palpites, heatmap e simulação de resultado por partida (grupos e mata-mata).',
   },
   {
     id: 'possibilidades_vencer',
+    fase: FASE_ANALISE_GRUPOS,
     configKey: 'analise_possibilidades_vencer',
     label: 'Possibilidades de vencer bolão',
     desc: 'Simulação Monte Carlo: sorteia placares conforme a distribuição dos palpites.',
   },
   {
     id: 'possibilidades_exaustivas',
+    fase: FASE_ANALISE_GRUPOS,
     configKey: 'analise_possibilidades_exaustivas',
     label: 'Simulação pelos palpites',
     desc: 'Se os jogos restantes saírem como cada um palpitou: pontuação, posição final e distância aos vizinhos.',
   },
   {
     id: 'placar_favorito',
+    fase: FASE_ANALISE_GRUPOS,
     configKey: 'analise_placar_favorito',
     label: 'Placar favorito',
     desc: 'Placar mais palpitado em cada jogo tratado como participante virtual.',
+  },
+  {
+    id: 'palpites_jogo_mata',
+    fase: FASE_ANALISE_MATA,
+    configKey: 'analise_palpites_jogo',
+    label: 'Palpites por jogo',
+    desc: 'Distribuição de palpites, heatmap e simulação de resultado por confronto do mata-mata.',
+    ocultarToggleAdmin: true,
   },
 ];
 
@@ -46,6 +66,18 @@ const MONTE_CARLO_ITERACOES = 3000;
 
 export function getAnalisesHabilitadas(config) {
   return TIPOS_ANALISE.filter((t) => config[t.configKey] !== false);
+}
+
+export function getAnalisesPorFase(config, fase) {
+  return getAnalisesHabilitadas(config).filter((t) => t.fase === fase);
+}
+
+export function isAnalisePalpitesPorJogo(tipoId) {
+  return tipoId === 'palpites_jogo' || tipoId === 'palpites_jogo_mata';
+}
+
+export function getTiposAnaliseAdmin() {
+  return TIPOS_ANALISE.filter((t) => !t.ocultarToggleAdmin);
 }
 
 export function getJogosPendentes(jogos) {
